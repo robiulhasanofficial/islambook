@@ -7,8 +7,15 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: "https://islambook.onrender.com" } // dev only; production হলে নির্দিষ্ট origin প্রদান করো
+  cors: {
+    origin: [
+      "https://islambook.onrender.com",       // নিজের domain
+      "https://robiulhasanofficial.github.io" // GitHub Pages domain
+    ],
+    methods: ["GET", "POST"]
+  }
 });
+
 
 // optional in-memory cache of recent posts (no DB)
 const POSTS_CACHE = []; // keep small, e.g., last 200
