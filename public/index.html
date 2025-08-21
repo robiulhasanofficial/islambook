@@ -1,0 +1,355 @@
+<!-- public/index.html -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mini Image Share (no DB)</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width:900px; margin:20px auto; padding:0 10px; }
+    header { display:flex; gap:12px; align-items:center; }
+    #feed { margin-top:20px; display:flex; flex-direction:column; gap:16px; }
+    .post { border:1px solid #ddd; padding:10px; border-radius:8px; background:#fff; }
+    .meta { display:flex; justify-content:space-between; gap:10px; font-size:13px; color:#555; }
+    img.post-img { max-width:100%; border-radius:6px; margin-top:8px; }
+    .actions { margin-top:8px; display:flex; gap:8px; align-items:center; }
+    .comments { margin-top:8px; font-size:14px; }
+    .comment { border-top:1px dashed #eee; padding-top:6px; margin-top:6px; }
+    button { cursor:pointer; }
+  </style>
+</head>
+<body>
+  <header>
+    <h2>Mini Image Share</h2>
+    <div style="margin-left:auto">You: <input id="username" placeholder="name" style="width:120px" /></div>
+  </header>
+
+  <section>
+    <form id="uploadForm">
+      <input type="file" id="imageInput" accept="image/*" required />
+      <input type="text" id="caption" placeholder="Caption (optional)" style="width:60%" />
+      <button type="submit">Upload</button>
+      <small id="uploadNote" style="margin-left:10px;color:#666">Max 3MB recommended</small>
+    </form>
+  </section>
+
+  <section id="feed">
+    <!-- posts will be appended here -->
+  </section>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+  // ---------- IndexedDB helper ----------
+  const DB_NAME = 'mini_social_v1';
+  const STORE = 'posts';
+  let dbPromise = null;
+
+  function openDB() {
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise((res, rej) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(STORE)) {
+          const store = db.createObjectStore(STORE, { keyPath: 'id' });
+          store.createIndex('created_at', 'created_at');
+        }
+      };
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => rej(req.error);
+    });
+    return dbPromise;
+  }
+
+  async function savePostToDB(post) {
+    const db = await openDB();
+    return new Promise((res, rej) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).put(post);
+      tx.oncomplete = () => res();
+      tx.onerror = () => rej(tx.error);
+    });
+  }
+
+  async function getAllPostsFromDB() {
+    const db = await openDB();
+    return new Promise((res, rej) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const store = tx.objectStore(STORE);
+      const req = store.getAll();
+      req.onsuccess = () => res(req.result.sort((a,b)=> new Date(b.created_at) - new Date(a.created_at)));
+      req.onerror = () => rej(req.error);
+    });
+  }
+
+  async function updatePostInDB(post) {
+    return savePostToDB(post);
+  }
+
+  // ---------- Utils ----------
+  function uid() {
+    if (crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2,9);
+  }
+
+  function timeNow() { return new Date().toISOString(); }
+
+  // ---------- Socket setup ----------
+  const socket = io(); // default connects to host
+  socket.on('connect', () => {
+    console.log('connected to socket', socket.id);
+    // ask server for sync cache (optional)
+    socket.emit('request_sync');
+  });
+
+  socket.on('sync', async (posts) => {
+    // server-sent cached posts
+    for (const p of posts) {
+      await savePostToDB(p);
+    }
+    await loadAndRenderFeed();
+  });
+
+  socket.on('post', async (post) => {
+    await savePostToDB(post);
+    prependPostToFeed(post);
+  });
+
+  socket.on('like', async (payload) => {
+    // payload: { postId, userId, action, likeId, created_at }
+    const db = await openDB();
+    const tx = db.transaction(STORE,'readwrite');
+    const store = tx.objectStore(STORE);
+    const req = store.get(payload.postId);
+    req.onsuccess = async () => {
+      const post = req.result;
+      if (!post) return;
+      post.likes = post.likes || [];
+      if (payload.action === 'like') {
+        post.likes.push({ id: payload.likeId, userId: payload.userId, created_at: payload.created_at });
+      } else {
+        post.likes = post.likes.filter(l => l.id !== payload.likeId && l.userId !== payload.userId);
+      }
+      await updatePostInDB(post);
+      refreshPostInDOM(post.id, post);
+    };
+  });
+
+  socket.on('comment', async (payload) => {
+    // payload: { postId, comment: { id, userId, text, created_at } }
+    const db = await openDB();
+    const tx = db.transaction(STORE,'readwrite');
+    const store = tx.objectStore(STORE);
+    const req = store.get(payload.postId);
+    req.onsuccess = async () => {
+      const post = req.result;
+      if (!post) return;
+      post.comments = post.comments || [];
+      post.comments.unshift(payload.comment);
+      await updatePostInDB(post);
+      refreshPostInDOM(post.id, post);
+    };
+  });
+
+  // ---------- UI rendering ----------
+  const feedEl = document.getElementById('feed');
+
+  function createPostElement(post) {
+    const el = document.createElement('div');
+    el.className = 'post';
+    el.id = 'post-' + post.id;
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.innerHTML = `<div><b>${escapeHtml(post.userName || 'Anonymous')}</b></div>
+                      <div>${new Date(post.created_at).toLocaleString()}</div>`;
+
+    const caption = document.createElement('div');
+    caption.textContent = post.caption || '';
+    caption.style.marginTop = '6px';
+
+    const img = document.createElement('img');
+    img.className = 'post-img';
+    img.alt = post.caption || '';
+    img.src = post.imageData; // dataURL
+
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+
+    const likeBtn = document.createElement('button');
+    likeBtn.textContent = '🤍 ' + ((post.likes && post.likes.length) || 0);
+    likeBtn.onclick = () => toggleLike(post.id);
+
+    const shareBtn = document.createElement('button');
+    shareBtn.textContent = '🔁 Share'; // share behavior is local copy only
+
+    actions.appendChild(likeBtn);
+    actions.appendChild(shareBtn);
+
+    const commentForm = document.createElement('form');
+    commentForm.onsubmit = (e) => {
+      e.preventDefault();
+      const input = commentForm.querySelector('input');
+      const text = input.value.trim();
+      if (!text) return;
+      postComment(post.id, text);
+      input.value = '';
+    };
+    const commentInput = document.createElement('input');
+    commentInput.placeholder = 'Write a comment...';
+    commentInput.style.width = '70%';
+    commentForm.appendChild(commentInput);
+    const cBtn = document.createElement('button');
+    cBtn.textContent = 'Post';
+    commentForm.appendChild(cBtn);
+
+    const commentsDiv = document.createElement('div');
+    commentsDiv.className = 'comments';
+    if (post.comments && post.comments.length) {
+      post.comments.forEach(c => {
+        const cEl = document.createElement('div');
+        cEl.className = 'comment';
+        cEl.innerHTML = `<b>${escapeHtml(c.userId)}</b>: ${escapeHtml(c.text)}`;
+        commentsDiv.appendChild(cEl);
+      });
+    }
+
+    el.appendChild(meta);
+    el.appendChild(img);
+    el.appendChild(actions);
+    el.appendChild(caption);
+    el.appendChild(commentForm);
+    el.appendChild(commentsDiv);
+
+    return el;
+  }
+
+  function prependPostToFeed(post) {
+    // if exists, remove old then prepend
+    const existing = document.getElementById('post-' + post.id);
+    if (existing) existing.remove();
+    const el = createPostElement(post);
+    feedEl.insertAdjacentElement('afterbegin', el);
+  }
+
+  function refreshPostInDOM(postId, post) {
+    const container = document.getElementById('post-' + postId);
+    if (!container) return;
+    const newEl = createPostElement(post);
+    container.replaceWith(newEl);
+  }
+
+  function escapeHtml(s) {
+    if (!s) return '';
+    return s.replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  async function loadAndRenderFeed() {
+    const posts = await getAllPostsFromDB();
+    feedEl.innerHTML = '';
+    posts.forEach(p => {
+      const el = createPostElement(p);
+      feedEl.appendChild(el);
+    });
+  }
+
+  // ---------- App logic: upload / like / comment ----------
+  document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fileInput = document.getElementById('imageInput');
+    const caption = document.getElementById('caption').value.trim();
+    const username = document.getElementById('username').value.trim() || 'Anonymous';
+    const file = fileInput.files[0];
+    if (!file) return alert('Choose an image first');
+    if (file.size > 3*1024*1024) {
+      if (!confirm('Image is large (>3MB). Continue?')) return;
+    }
+
+    // read as dataURL (base64)
+    const dataUrl = await new Promise((res, rej) => {
+      const fr = new FileReader();
+      fr.onload = () => res(fr.result);
+      fr.onerror = rej;
+      fr.readAsDataURL(file);
+    });
+
+    const post = {
+      id: uid(),
+      userName: username,
+      caption,
+      imageData: dataUrl,
+      created_at: timeNow(),
+      likes: [],
+      comments: []
+    };
+
+    // save locally and emit
+    await savePostToDB(post);
+    prependPostToFeed(post);
+    socket.emit('new_post', post);
+
+    // reset form
+    fileInput.value = '';
+    document.getElementById('caption').value = '';
+  });
+
+  async function toggleLike(postId) {
+    const user = document.getElementById('username').value.trim() || 'Anonymous';
+    const likeId = uid();
+    const payload = { postId, userId: user, likeId, action: 'like', created_at: timeNow() };
+
+    // optimistic update locally
+    const db = await openDB();
+    const tx = db.transaction(STORE,'readwrite');
+    const store = tx.objectStore(STORE);
+    const req = store.get(postId);
+    req.onsuccess = async () => {
+      const post = req.result;
+      if (!post) return;
+      post.likes = post.likes || [];
+      // naive toggle: if user already liked, we'll unlike
+      const existing = post.likes.find(l => l.userId === user);
+      if (existing) {
+        // unlike
+        payload.action = 'unlike';
+        payload.likeId = existing.id;
+        post.likes = post.likes.filter(l => l.userId !== user);
+      } else {
+        post.likes.push({ id: likeId, userId: user, created_at: payload.created_at });
+      }
+      await updatePostInDB(post);
+      refreshPostInDOM(postId, post);
+      // emit to server
+      socket.emit('like', payload);
+    };
+  }
+
+  async function postComment(postId, text) {
+    const user = document.getElementById('username').value.trim() || 'Anonymous';
+    const comment = { id: uid(), userId: user, text, created_at: timeNow() };
+    const payload = { postId, comment };
+
+    // optimistic local update
+    const db = await openDB();
+    const tx = db.transaction(STORE,'readwrite');
+    const store = tx.objectStore(STORE);
+    const req = store.get(postId);
+    req.onsuccess = async () => {
+      const post = req.result;
+      if (!post) return;
+      post.comments = post.comments || [];
+      post.comments.unshift(comment);
+      await updatePostInDB(post);
+      refreshPostInDOM(postId, post);
+      socket.emit('comment', payload);
+    };
+  }
+
+  // on page load, render saved posts
+  (async () => {
+    await openDB();
+    await loadAndRenderFeed();
+  })();
+  </script>
+</body>
+</html>
