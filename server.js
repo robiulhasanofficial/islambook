@@ -10,7 +10,7 @@ const io = new Server(server, {
   cors: {
     origin: [
       "https://islambook.onrender.com",       // নিজের domain
-      "https://robiulhasanofficial.github.io" // GitHub Pages domain
+      "https://robiulhasanofficial.github.io/islambook/public/" // GitHub Pages domain
     ],
     methods: ["GET", "POST"]
   }
