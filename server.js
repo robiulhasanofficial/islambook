@@ -7,7 +7,7 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: "*" } // dev only; production হলে নির্দিষ্ট origin প্রদান করো
+  cors: { origin: "https://islambook.onrender.com" } // dev only; production হলে নির্দিষ্ট origin প্রদান করো
 });
 
 // optional in-memory cache of recent posts (no DB)

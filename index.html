@@ -1,4 +1,3 @@
-<!-- public/index.html -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -6,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Mini Image Share (no DB)</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width:900px; margin:20px auto; padding:0 10px; }
+    body { font-family: Arial, sans-serif; max-width:900px; margin:20px auto; padding:0 10px; background:#f5f5f5; }
     header { display:flex; gap:12px; align-items:center; }
     #feed { margin-top:20px; display:flex; flex-direction:column; gap:16px; }
     .post { border:1px solid #ddd; padding:10px; border-radius:8px; background:#fff; }
@@ -33,12 +32,63 @@
     </form>
   </section>
 
-  <section id="feed">
-    <!-- posts will be appended here -->
-  </section>
+  <section id="feed"></section>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
+  // ---------- Socket setup ----------
+  const socket = io("https://islambook.onrender.com"); 
+  socket.on('connect', () => {
+    console.log('connected to socket', socket.id);
+    socket.emit('request_sync');
+  });
+
+  socket.on('sync', async (posts) => {
+    for (const p of posts) {
+      await savePostToDB(p);
+    }
+    await loadAndRenderFeed();
+  });
+
+  socket.on('post', async (post) => {
+    await savePostToDB(post);
+    prependPostToFeed(post);
+  });
+
+  socket.on('like', async (payload) => {
+    const db = await openDB();
+    const tx = db.transaction(STORE,'readwrite');
+    const store = tx.objectStore(STORE);
+    const req = store.get(payload.postId);
+    req.onsuccess = async () => {
+      const post = req.result;
+      if (!post) return;
+      post.likes = post.likes || [];
+      if (payload.action === 'like') {
+        post.likes.push({ id: payload.likeId, userId: payload.userId, created_at: payload.created_at });
+      } else {
+        post.likes = post.likes.filter(l => l.id !== payload.likeId && l.userId !== payload.userId);
+      }
+      await updatePostInDB(post);
+      refreshPostInDOM(post.id, post);
+    };
+  });
+
+  socket.on('comment', async (payload) => {
+    const db = await openDB();
+    const tx = db.transaction(STORE,'readwrite');
+    const store = tx.objectStore(STORE);
+    const req = store.get(payload.postId);
+    req.onsuccess = async () => {
+      const post = req.result;
+      if (!post) return;
+      post.comments = post.comments || [];
+      post.comments.unshift(payload.comment);
+      await updatePostInDB(post);
+      refreshPostInDOM(post.id, post);
+    };
+  });
+
   // ---------- IndexedDB helper ----------
   const DB_NAME = 'mini_social_v1';
   const STORE = 'posts';
@@ -94,63 +144,6 @@
 
   function timeNow() { return new Date().toISOString(); }
 
-  // ---------- Socket setup ----------
-  const socket = io(); // default connects to host
-  socket.on('connect', () => {
-    console.log('connected to socket', socket.id);
-    // ask server for sync cache (optional)
-    socket.emit('request_sync');
-  });
-
-  socket.on('sync', async (posts) => {
-    // server-sent cached posts
-    for (const p of posts) {
-      await savePostToDB(p);
-    }
-    await loadAndRenderFeed();
-  });
-
-  socket.on('post', async (post) => {
-    await savePostToDB(post);
-    prependPostToFeed(post);
-  });
-
-  socket.on('like', async (payload) => {
-    // payload: { postId, userId, action, likeId, created_at }
-    const db = await openDB();
-    const tx = db.transaction(STORE,'readwrite');
-    const store = tx.objectStore(STORE);
-    const req = store.get(payload.postId);
-    req.onsuccess = async () => {
-      const post = req.result;
-      if (!post) return;
-      post.likes = post.likes || [];
-      if (payload.action === 'like') {
-        post.likes.push({ id: payload.likeId, userId: payload.userId, created_at: payload.created_at });
-      } else {
-        post.likes = post.likes.filter(l => l.id !== payload.likeId && l.userId !== payload.userId);
-      }
-      await updatePostInDB(post);
-      refreshPostInDOM(post.id, post);
-    };
-  });
-
-  socket.on('comment', async (payload) => {
-    // payload: { postId, comment: { id, userId, text, created_at } }
-    const db = await openDB();
-    const tx = db.transaction(STORE,'readwrite');
-    const store = tx.objectStore(STORE);
-    const req = store.get(payload.postId);
-    req.onsuccess = async () => {
-      const post = req.result;
-      if (!post) return;
-      post.comments = post.comments || [];
-      post.comments.unshift(payload.comment);
-      await updatePostInDB(post);
-      refreshPostInDOM(post.id, post);
-    };
-  });
-
   // ---------- UI rendering ----------
   const feedEl = document.getElementById('feed');
 
@@ -171,7 +164,7 @@
     const img = document.createElement('img');
     img.className = 'post-img';
     img.alt = post.caption || '';
-    img.src = post.imageData; // dataURL
+    img.src = post.imageData;
 
     const actions = document.createElement('div');
     actions.className = 'actions';
@@ -181,7 +174,7 @@
     likeBtn.onclick = () => toggleLike(post.id);
 
     const shareBtn = document.createElement('button');
-    shareBtn.textContent = '🔁 Share'; // share behavior is local copy only
+    shareBtn.textContent = '🔁 Share';
 
     actions.appendChild(likeBtn);
     actions.appendChild(shareBtn);
@@ -225,7 +218,6 @@
   }
 
   function prependPostToFeed(post) {
-    // if exists, remove old then prepend
     const existing = document.getElementById('post-' + post.id);
     if (existing) existing.remove();
     const el = createPostElement(post);
@@ -265,7 +257,6 @@
       if (!confirm('Image is large (>3MB). Continue?')) return;
     }
 
-    // read as dataURL (base64)
     const dataUrl = await new Promise((res, rej) => {
       const fr = new FileReader();
       fr.onload = () => res(fr.result);
@@ -283,12 +274,10 @@
       comments: []
     };
 
-    // save locally and emit
     await savePostToDB(post);
     prependPostToFeed(post);
     socket.emit('new_post', post);
 
-    // reset form
     fileInput.value = '';
     document.getElementById('caption').value = '';
   });
@@ -298,7 +287,6 @@
     const likeId = uid();
     const payload = { postId, userId: user, likeId, action: 'like', created_at: timeNow() };
 
-    // optimistic update locally
     const db = await openDB();
     const tx = db.transaction(STORE,'readwrite');
     const store = tx.objectStore(STORE);
@@ -307,10 +295,8 @@
       const post = req.result;
       if (!post) return;
       post.likes = post.likes || [];
-      // naive toggle: if user already liked, we'll unlike
       const existing = post.likes.find(l => l.userId === user);
       if (existing) {
-        // unlike
         payload.action = 'unlike';
         payload.likeId = existing.id;
         post.likes = post.likes.filter(l => l.userId !== user);
@@ -319,7 +305,6 @@
       }
       await updatePostInDB(post);
       refreshPostInDOM(postId, post);
-      // emit to server
       socket.emit('like', payload);
     };
   }
@@ -329,7 +314,6 @@
     const comment = { id: uid(), userId: user, text, created_at: timeNow() };
     const payload = { postId, comment };
 
-    // optimistic local update
     const db = await openDB();
     const tx = db.transaction(STORE,'readwrite');
     const store = tx.objectStore(STORE);
@@ -345,7 +329,6 @@
     };
   }
 
-  // on page load, render saved posts
   (async () => {
     await openDB();
     await loadAndRenderFeed();
