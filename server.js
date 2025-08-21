@@ -2,57 +2,50 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const path = require('path');
+const cors = require('cors');
 
 const app = express();
+app.use(cors()); // prod-এ origin সীমাবদ্ধ করবে
+app.use(express.json());
+app.use(express.static('public')); // যদি তুমি client ফাইল সার্ভ করুন; নাহলে অপশনাল
+
 const server = http.createServer(app);
+
+// cors options: production-এ specific origin লিখবে
 const io = new Server(server, {
-  cors: {
-    origin: [
-      "https://islambook.onrender.com",       // নিজের domain
-      "https://robiulhasanofficial.github.io/islambook/public/" // GitHub Pages domain
-    ],
-    methods: ["GET", "POST"]
-  }
+  cors: { origin: '*' }
 });
 
-
-// optional in-memory cache of recent posts (no DB)
-const POSTS_CACHE = []; // keep small, e.g., last 200
-
-app.use(express.static(path.join(__dirname, 'public'))); // serve client from /public
+// Simple in-memory store (restart এ হারাবে). পরবর্তীতে DB ব্যবহার করো।
+let lastFull = { list: [], lastUpdated: 0 };
 
 io.on('connection', (socket) => {
-  console.log('socket connected', socket.id);
+  console.log('socket connected:', socket.id);
 
-  // when a client asks for sync (on connect) send cached posts
-  socket.on('request_sync', () => {
-    socket.emit('sync', POSTS_CACHE);
+  socket.on('orders:hello', (data) => {
+    // যদি সার্ভারে নতুন ডেটা থাকে, ক্লায়েন্টকে পাঠানো হবে
+    try {
+      if(lastFull.lastUpdated > (data.lastUpdated || 0)){
+        socket.emit('orders:full', lastFull);
+      }
+    } catch(e){ console.error(e); }
   });
 
-  // receive new post from a client (post contains id, user, caption, imageData (base64), created_at)
-  socket.on('new_post', (post) => {
-    // keep small cache
-    POSTS_CACHE.push(post);
-    if (POSTS_CACHE.length > 300) POSTS_CACHE.shift();
-    // broadcast to all clients (including sender)
-    io.emit('post', post);
+  socket.on('orders:sync', (payload) => {
+    try {
+      // update server memory if payload is newer
+      if(payload.lastUpdated && payload.lastUpdated > lastFull.lastUpdated){
+        lastFull = { list: payload.list || [], lastUpdated: payload.lastUpdated };
+      }
+      // broadcast to other clients (not back to sender)
+      socket.broadcast.emit('orders:sync', payload);
+    } catch(e){ console.error(e); }
   });
 
-  // like event: { postId, userId, likeId, action: 'like'|'unlike', created_at }
-  socket.on('like', (payload) => {
-    io.emit('like', payload);
-  });
-
-  // comment event: { postId, comment: { id, userId, text, created_at } }
-  socket.on('comment', (payload) => {
-    io.emit('comment', payload);
-  });
-
-  socket.on('disconnect', () => {
-    console.log('socket disconnected', socket.id);
+  socket.on('disconnect', ()=> {
+    console.log('socket disconnected:', socket.id);
   });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server listening on http://localhost:${PORT}`));
+server.listen(PORT, ()=> console.log(`Server listening on ${PORT}`));
