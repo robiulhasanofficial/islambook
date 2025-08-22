@@ -1,106 +1,125 @@
 <!doctype html>
-<html lang="en">
+<html lang="bn">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="theme-color" content="#0ea5e9" />
-  <title>Mini Image Share (No DB) — Ultra Animated</title>
+  <title>Mini Image Share — Partial Search + Profile (Enhanced)</title>
   <style>
-    /* (styling identical to your original file) */
-    :root { --c1: #7c3aed; --c2: #0ea5e9; --c3: #10b981; --c4: #f59e0b; --bg: #0b1020; --card: rgba(255,255,255,0.08); --card-strong: rgba(255,255,255,0.14); --text: #e5e7eb; --muted: #a8b3cf; --ring: rgba(14,165,233,0.6); --shadow: 0 10px 30px rgba(0,0,0,0.35); --radius: 18px; --blur: 16px; --speed: 16s; }
-    @media (max-width: 640px) { :root { --c1: #22d3ee; --c2: #f472b6; --c3: #a3e635; --c4: #f97316; --speed: 12s; } }
-    @media (prefers-reduced-motion: reduce) { :root { --speed: 0s; } .floaty, .pulse, .spin, .pan, .rise, .shimmer { animation: none !important; } .reveal { transform: none !important; opacity: 1 !important; } }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; margin:0; padding:0; }
-    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji"; color: var(--text); background: radial-gradient(1200px 800px at 10% 10%, rgba(124,58,237,0.20), transparent 60%), radial-gradient(1200px 800px at 90% 20%, rgba(14,165,233,0.20), transparent 60%), radial-gradient(1200px 800px at 50% 90%, rgba(16,185,129,0.18), transparent 60%), linear-gradient(135deg, #0b1020 0%, #05070f 100%); min-height: 100vh; overflow-x: hidden; }
-    .bg-blobs::before, .bg-blobs::after { content: ""; position: fixed; inset: auto auto 10% -10%; width: 60vmax; height: 60vmax; background: radial-gradient(circle at 30% 30%, var(--c1), transparent 50%), radial-gradient(circle at 70% 60%, var(--c2), transparent 45%), radial-gradient(circle at 40% 80%, var(--c3), transparent 40%); filter: blur(60px) saturate(140%); opacity: 0.35; z-index: -1; transform: translate3d(0,0,0); animation: blobs var(--speed) ease-in-out infinite alternate; }
-    .bg-blobs::after { inset: -15% -10% auto auto; transform: translate3d(0,0,0) rotate(8deg); opacity: 0.28; animation-duration: calc(var(--speed) * 1.3); }
-    @keyframes blobs { from { transform: translate3d(-4%, 2%, 0) scale(1); } to { transform: translate3d(3%, -3%, 0) scale(1.05); } }
-    .wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 80px; position: relative; }
-    header.app { display:flex; align-items:center; gap:14px; position: sticky; top: 0; z-index: 50; padding: 14px 16px; margin: 12px 0 18px; background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(var(--blur)); backdrop-filter: blur(var(--blur)); border: 1px solid rgba(255,255,255,0.12); border-radius: calc(var(--radius) + 6px); box-shadow: var(--shadow); }
-    .logo { width: 40px; height: 40px; border-radius: 12px; position: relative; overflow: hidden; background: conic-gradient(from 0deg, var(--c1), var(--c2), var(--c3), var(--c4), var(--c1)); animation: spin var(--speed) linear infinite; }
-    @keyframes spin { to { transform: rotate(1turn); } }
-    h1.title { font-size: clamp(20px, 3vw, 28px); line-height: 1.1; margin: 0; letter-spacing: 0.3px; background: linear-gradient(90deg, var(--c1), var(--c2), var(--c3), var(--c4)); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 2px 12px rgba(14,165,233,0.35)); }
-    .userbox { margin-left:auto; display:flex; align-items:center; gap:10px; }
-    .userbox input { width: 150px; max-width: 42vw; color: var(--text); background: var(--card); border: 1px solid rgba(255,255,255,0.14); border-radius: 12px; padding: 10px 12px; outline: none; transition: box-shadow .2s ease, transform .2s ease, border-color .2s ease; }
-    .userbox input:focus { border-color: var(--ring); box-shadow: 0 0 0 6px rgba(14,165,233,0.15); transform: translateY(-1px); }
-    .card { background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04)); -webkit-backdrop-filter: blur(var(--blur)); backdrop-filter: blur(var(--blur)); border: 1px solid rgba(255,255,255,0.16); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
-    .card::after { content:""; position:absolute; inset: -2px; z-index:-1; border-radius: inherit; background: conic-gradient(from 0deg, transparent 0 25%, rgba(255,255,255,0.08) 30% 50%, transparent 55% 100%); animation: pan calc(var(--speed) * 1.2) linear infinite; filter: blur(12px); }
-    @keyframes pan { to { transform: rotate(1turn); } }
-    form#uploadForm { display:flex; flex-wrap: wrap; gap:10px; align-items:center; }
-    input[type="file"], input[type="text"] { color: var(--text); background: var(--card); border: 1px solid rgba(255,255,255,0.14); border-radius: 12px; padding: 10px 12px; outline: none; }
-    input[type="text"] { flex: 1 1 260px; }
-    button { cursor:pointer; border:0; padding: 10px 14px; border-radius: 999px; font-weight: 600; color: #0b1020; background: linear-gradient(90deg, var(--c1), var(--c2), var(--c3)); transition: transform .15s ease, box-shadow .15s ease, filter .2s ease; box-shadow: 0 10px 20px rgba(14,165,233,0.28); position: relative; overflow: hidden; }
-    button:hover { transform: translateY(-1px); } button:active { transform: translateY(0) scale(0.98); }
-    button .shimmer { content: ""; position:absolute; inset:0; pointer-events:none; background: linear-gradient(120deg, transparent 0 40%, rgba(255,255,255,0.5) 50%, transparent 60% 100%); transform: translateX(-100%); animation: shimmer calc(var(--speed) * 0.6) ease-in-out infinite; }
-    @keyframes shimmer { to { transform: translateX(100%); } }
-    small#uploadNote { color: var(--muted); }
-    #feed { margin-top:18px; display:grid; grid-template-columns: 1fr; gap: 16px; }
-    @media (min-width: 720px) { #feed { grid-template-columns: 1fr; } }
-    .post { background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04)); -webkit-backdrop-filter: blur(var(--blur)); backdrop-filter: blur(var(--blur)); border: 1px solid rgba(255,255,255,0.12); border-radius: var(--radius); padding: 12px; box-shadow: var(--shadow); transform: translateY(6px) scale(0.98); opacity: 0; transition: transform .5s cubic-bezier(.21, .61, .35, 1), opacity .5s ease; }
-    .post.show { transform: translateY(0) scale(1); opacity: 1; }
-    .meta { display:flex; justify-content:space-between; gap:10px; font-size:13px; color:var(--muted); }
-    img.post-img { width: 100%; height: auto; border-radius: 12px; margin-top:8px; outline: 1px solid rgba(255,255,255,0.1); transition: transform .4s ease, filter .4s ease; }
-    .post:hover img.post-img { transform: scale(1.01); filter: saturate(115%) contrast(105%); }
-    .actions { margin-top:8px; display:flex; gap:10px; align-items:center; }
-    .like-btn { position: relative; } .like-btn.liked { box-shadow: 0 12px 24px rgba(16,185,129,0.35); }
-    .like-pop { position:absolute; left:50%; top:-6px; transform: translate(-50%, -20px) scale(.6); opacity:0; pointer-events:none; font-size:18px; transition: transform .35s cubic-bezier(.18,.89,.32,1.28), opacity .35s ease; }
-    .like-btn.liked .like-pop { opacity:1; transform: translate(-50%, -28px) scale(1); }
-    .comments { margin-top:10px; font-size:14px; }
-    .comment { border-top:1px dashed rgba(255,255,255,0.08); padding-top:6px; margin-top:6px; }
-    .divider { height:1px; margin:8px 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent); }
-    .watermark { text-align:center; color: var(--muted); font-size:12px; margin-top: 22px; }
+    :root { --c1:#7c3aed; --c2:#0ea5e9; --bg:#0b1020; --text:#e5e7eb; --muted:#a8b3cf; --card:rgba(255,255,255,0.04); --radius:12px; --blur:14px; --speed:16s; }
+    *{box-sizing:border-box} html,body{height:100%;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;color:var(--text);background:linear-gradient(135deg,#0b1020 0%,#05070f 100%);min-height:100vh}
+    .wrap{max-width:980px;margin:0 auto;padding:20px}
+    header.app{display:flex;align-items:center;gap:12px;position:sticky;top:12px;background:linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01));padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.04);backdrop-filter:blur(var(--blur))}
+    .logo{width:44px;height:44px;border-radius:10px;background:conic-gradient(from 0deg,var(--c1),var(--c2));animation:spin var(--speed) linear infinite}
+    @keyframes spin{to{transform:rotate(1turn)}}
+    h1.title{margin:0;font-size:18px;background:linear-gradient(90deg,var(--c1),var(--c2));-webkit-background-clip:text;color:transparent}
+    .header-row{display:flex;align-items:center;gap:10px;margin-left:auto}
+    .id-badge{background:rgba(255,255,255,0.03);padding:8px 10px;border-radius:12px;font-size:13px;color:var(--muted);cursor:pointer;border:1px solid rgba(255,255,255,0.03)}
+    .search-wrap{display:flex;gap:8px;align-items:center}
+    .search-wrap input{padding:8px 10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.02);color:var(--text);min-width:220px}
+    .search-wrap button{padding:8px 10px;border-radius:10px;border:0;background:linear-gradient(90deg,var(--c1),var(--c2));color:#05070f;font-weight:600;cursor:pointer}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:14px;border-radius:12px;margin-top:16px;border:1px solid rgba(255,255,255,0.03)}
+    form#uploadForm{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    input[type=file], input[type=text]{padding:8px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.02);color:var(--text)}
+    button.primary{padding:8px 12px;border-radius:999px;border:0;background:linear-gradient(90deg,var(--c1),var(--c2));color:#05070f;font-weight:700;cursor:pointer}
+    #feed{margin-top:18px;display:grid;gap:14px}
+    .post{padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.04);background:linear-gradient(180deg,rgba(255,255,255,0.01),rgba(255,255,255,0.005))}
+    .profile-post{padding:20px;border-radius:16px;border:1px solid rgba(255,255,255,0.06);background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));box-shadow:0 10px 30px rgba(0,0,0,0.6)}
+    .meta{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px}
+    .user-meta{display:flex;align-items:center;gap:8px}
+    .user-meta small{color:var(--muted);font-size:12px}
+    .user-id-link{cursor:pointer;color:var(--muted);font-size:12px;padding:4px;border-radius:6px}
+    img.post-img{width:100%;border-radius:10px;margin-top:8px}
+    .profile-post img.post-img{border-radius:12px;max-height:620px;object-fit:cover}
+    .actions{display:flex;gap:8px;margin-top:8px}
+    .comments{margin-top:8px;font-size:14px;color:var(--text)}
+    .comment{border-top:1px dashed rgba(255,255,255,0.02);padding-top:6px;margin-top:6px}
+    .info-line{margin-top:8px;color:var(--muted);font-size:13px}
+    .no-results{padding:18px;text-align:center;color:var(--muted)}
+    .badge-profile{background:rgba(255,255,255,0.02);padding:6px 8px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);font-size:13px;margin-left:8px}
+    .back-btn{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:6px 8px;border-radius:8px;color:var(--muted);cursor:pointer;margin-left:8px}
+    .stat-row{display:flex;gap:12px;align-items:center;margin-top:8px}
+    .stat-item{padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03);font-size:13px}
+    .small-btn{padding:6px 8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--muted);cursor:pointer}
   </style>
 </head>
-<body class="bg-blobs">
+<body>
   <div class="wrap">
     <header class="app">
       <div class="logo" aria-hidden="true"></div>
       <h1 class="title">Mini Image Share</h1>
-      <div class="userbox">
-        <label for="username" class="sr-only">Your name</label>
-        <input id="username" placeholder="You" />
+
+      <div class="header-row">
+        <div class="search-wrap" title="Search by user name or ID">
+          <input id="searchInput" placeholder="Search name or ID" />
+          <button id="searchBtn">Search</button>
+          <button id="clearSearch">Show all</button>
+          <button id="searchModeToggle" class="id-badge" title="Toggle exact / partial">Mode: partial</button>
+        </div>
+
+        <div style="display:flex;align-items:center">
+          <div id="idBadge" class="id-badge" title="Click to copy your ID">You: —</div>
+        </div>
       </div>
     </header>
 
-    <section class="card reveal">
+    <section class="card">
       <form id="uploadForm">
         <input type="file" id="imageInput" accept="image/*" required />
         <input type="text" id="caption" placeholder="Caption (optional)" />
-        <button type="submit" id="uploadBtn">
-          <span>Upload</span>
-          <i class="shimmer"></i>
-        </button>
-        <small id="uploadNote">Max 3MB recommended</small>
+        <button class="primary" type="submit" id="uploadBtn">Upload</button>
+        <small id="uploadNote" class="info-line">Max 3MB recommended</small>
       </form>
     </section>
 
+    <div id="searchInfo" class="info-line" style="display:none"></div>
+
     <section id="feed"></section>
 
-    <p class="watermark">Made with ♥ — local-only storage + live sync</p>
+    <p class="info-line" style="margin-top:18px;color:var(--muted)">Made with ♥ — local-only storage + live sync</p>
   </div>
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script>
-  // ---------- Socket setup (diagnostic + robust + dedupe-aware) ----------
+  // ---------- USER: ask once, create readable ID + store ----------
+  let currentUser = localStorage.getItem("mini_user_name");
+  let currentUserId = localStorage.getItem("mini_user_id"); // e.g. Name#abc123
+  if (!currentUser) {
+    currentUser = prompt("আপনার নাম লিখুন:")?.trim() || "Anonymous";
+    localStorage.setItem("mini_user_name", currentUser);
+  }
+  if (!currentUserId) {
+    const raw = (crypto && crypto.randomUUID) ? crypto.randomUUID() : ('id-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+    const suffix = raw.replace(/-/g,'').slice(0,6);
+    const cleanName = currentUser.replace(/\s+/g,'').slice(0,12) || 'User';
+    currentUserId = `${cleanName}#${suffix}`;
+    localStorage.setItem("mini_user_id", currentUserId);
+  }
+
+  // show id badge (click to copy)
+  const idBadge = document.getElementById('idBadge');
+  idBadge.textContent = `You: ${currentUserId}`;
+  idBadge.onclick = () => {
+    navigator.clipboard?.writeText(currentUserId).then(()=> {
+      const prev = idBadge.textContent;
+      idBadge.textContent = 'Copied!';
+      setTimeout(()=> idBadge.textContent = `You: ${currentUserId}`, 900);
+    }).catch(()=>{ alert('Copy failed — your ID: ' + currentUserId) });
+  };
+
+  // ---------- Socket ----------
   const socket = io("https://islambook.onrender.com", { transports: ['websocket','polling'] });
+  socket.on('connect', () => { console.log('[SOCKET] connected', socket.id); socket.emit('request_sync'); });
+  socket.on('disconnect', (r)=> console.log('[SOCKET] disconnect', r));
+  socket.on('connect_error',(e)=> console.error('[SOCKET] connect_error', e));
+  socket.onAny((ev,...args)=> console.log('[SOCKET] incoming', ev, args));
 
-  socket.on('connect', () => {
-    console.log('[SOCKET] connected', socket.id);
-    socket.emit('request_sync');
-  });
-
-  socket.on('disconnect', (reason) => console.log('[SOCKET] disconnect', reason));
-  socket.on('connect_error', (err) => console.error('[SOCKET] connect_error', err));
-  socket.onAny((ev, ...args) => console.log('[SOCKET] incoming', ev, args));
-
-  // ---------- IndexedDB helper ----------
+  // ---------- IndexedDB ----------
   const DB_NAME = 'mini_social_v1';
   const STORE = 'posts';
   let dbPromise = null;
-
-  function openDB() {
-    if (dbPromise) return dbPromise;
+  function openDB(){
+    if(dbPromise) return dbPromise;
     dbPromise = new Promise((res, rej) => {
       const req = indexedDB.open(DB_NAME, 1);
       req.onupgradeneeded = (e) => {
@@ -108,68 +127,93 @@
         if (!db.objectStoreNames.contains(STORE)) {
           const store = db.createObjectStore(STORE, { keyPath: 'id' });
           store.createIndex('created_at', 'created_at');
+          store.createIndex('userId', 'userId');
         }
       };
-      req.onsuccess = () => res(req.result);
-      req.onerror = () => rej(req.error);
+      req.onsuccess = ()=> res(req.result);
+      req.onerror = ()=> rej(req.error);
     });
     return dbPromise;
   }
 
-  async function savePostToDB(post) {
+  async function savePostToDB(post){
     const db = await openDB();
     return new Promise((res, rej) => {
       const tx = db.transaction(STORE, 'readwrite');
       tx.objectStore(STORE).put(post);
-      tx.oncomplete = () => res();
-      tx.onerror = () => rej(tx.error);
+      tx.oncomplete = ()=> res();
+      tx.onerror = ()=> rej(tx.error);
     });
   }
-
-  async function existsInDB(postId) {
+  async function existsInDB(postId){
     const db = await openDB();
     return new Promise((res, rej) => {
-      const tx = db.transaction(STORE, 'readonly');
-      const store = tx.objectStore(STORE);
-      const req = store.get(postId);
-      req.onsuccess = () => res(!!req.result);
-      req.onerror = () => rej(req.error);
+      const tx = db.transaction(STORE,'readonly');
+      const req = tx.objectStore(STORE).get(postId);
+      req.onsuccess = ()=> res(!!req.result);
+      req.onerror = ()=> rej(req.error);
     });
   }
-
-  async function getAllPostsFromDB() {
+  async function getAllPostsFromDB(){
     const db = await openDB();
     return new Promise((res, rej) => {
-      const tx = db.transaction(STORE, 'readonly');
-      const store = tx.objectStore(STORE);
-      const req = store.getAll();
-      req.onsuccess = () => res(req.result.sort((a,b)=> new Date(b.created_at) - new Date(a.created_at)));
-      req.onerror = () => rej(req.error);
+      const tx = db.transaction(STORE,'readonly');
+      const req = tx.objectStore(STORE).getAll();
+      req.onsuccess = ()=> res(req.result.sort((a,b)=> new Date(b.created_at) - new Date(a.created_at)));
+      req.onerror = ()=> rej(req.error);
     });
   }
-
-  async function updatePostInDB(post) { return savePostToDB(post); }
+  async function updatePostInDB(post){ return savePostToDB(post); }
+  async function deletePostFromDB(postId){
+    const db = await openDB();
+    return new Promise((res, rej) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).delete(postId);
+      tx.oncomplete = ()=> res();
+      tx.onerror = ()=> rej(tx.error);
+    });
+  }
 
   // ---------- Utils ----------
-  function uid() { return (crypto && crypto.randomUUID) ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2,9); }
-  function timeNow() { return new Date().toISOString(); }
-  function escapeHtml(s) { return (!s ? '' : s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))); }
+  function uid(){ return (crypto && crypto.randomUUID) ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2,9); }
+  function timeNow(){ return new Date().toISOString(); }
+  function escapeHtml(s){ return (!s? '': String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))); }
 
-  // ---------- UI rendering ----------
+  // ---------- UI & Render ----------
   const feedEl = document.getElementById('feed');
+  const searchInput = document.getElementById('searchInput');
+  const searchBtn = document.getElementById('searchBtn');
+  const clearSearch = document.getElementById('clearSearch');
+  const searchInfo = document.getElementById('searchInfo');
+  const searchModeToggle = document.getElementById('searchModeToggle');
 
-  function createPostElement(post) {
+  // global state
+  let currentProfileViewUser = null; // when set, createPostElement will style posts bigger
+  let currentSearchPartial = true; // toggled by searchModeToggle
+
+  searchModeToggle.addEventListener('click', ()=>{
+    currentSearchPartial = !currentSearchPartial;
+    searchModeToggle.textContent = `Mode: ${currentSearchPartial? 'partial' : 'exact'}`;
+  });
+
+  function createPostElement(post){
     const el = document.createElement('div');
     el.className = 'post';
     el.id = 'post-' + post.id;
 
+    // if we're in a profile view for this user, apply larger card style
+    if (currentProfileViewUser && post.userId === currentProfileViewUser) el.classList.add('profile-post');
+
     const meta = document.createElement('div');
     meta.className = 'meta';
-    meta.innerHTML = `<div><b>${escapeHtml(post.userName || 'Anonymous')}</b></div>\n                      <div>${new Date(post.created_at).toLocaleString()}</div>`;
-
-    const caption = document.createElement('div');
-    caption.textContent = post.caption || '';
-    caption.style.marginTop = '6px';
+    const left = document.createElement('div'); left.className='user-meta';
+    // userName + clickable userId (if exists)
+    const nameHTML = `<strong>${escapeHtml(post.userName || 'Anonymous')}</strong>`;
+    const idHTML = post.userId ? ` <span class="user-id-link" title="View profile" data-userid="${escapeHtml(post.userId)}">${escapeHtml(post.userId)}</span>` : '';
+    left.innerHTML = nameHTML + idHTML;
+    // attach click handler for profile (delegation after element created)
+    const right = document.createElement('div'); right.textContent = new Date(post.created_at).toLocaleString();
+    meta.appendChild(left); meta.appendChild(right);
 
     const img = document.createElement('img');
     img.className = 'post-img';
@@ -178,47 +222,63 @@
     img.decoding = 'async';
     img.src = post.imageData;
 
+    const caption = document.createElement('div');
+    caption.style.marginTop = '6px';
+    caption.textContent = post.caption || '';
+
     const actions = document.createElement('div');
     actions.className = 'actions';
 
     const likeBtn = document.createElement('button');
     likeBtn.className = 'like-btn';
-    likeBtn.innerHTML = `🤍 <span class="like-count">${(post.likes && post.likes.length) || 0}</span><span class="like-pop">💥</span>`;
+    const likeCount = (post.likes && post.likes.length) || 0;
+    likeBtn.innerHTML = `🤍 <span class="like-count">${likeCount}</span>`;
+    if (post.likes && post.likes.find(l => l.userId === currentUserId)) likeBtn.classList.add('liked');
     likeBtn.onclick = () => toggleLike(post.id, likeBtn);
 
     const shareBtn = document.createElement('button');
     shareBtn.textContent = '🔁 Share';
+    shareBtn.onclick = () => {
+      if (navigator.share) {
+        navigator.share({ title: post.caption || 'Image', text: post.caption || '', url: post.imageData }).catch(()=>{});
+      } else {
+        window.open(post.imageData, '_blank');
+      }
+    };
 
     actions.appendChild(likeBtn);
     actions.appendChild(shareBtn);
 
-    const divider = document.createElement('div');
-    divider.className = 'divider';
+    // delete button if current user owns the post
+    if (post.userId === currentUserId) {
+      const delBtn = document.createElement('button');
+      delBtn.textContent = '🗑️ Delete';
+      delBtn.className = 'small-btn';
+      delBtn.onclick = () => {
+        if (!confirm('আপনি কি নিশ্চিত এই পোস্ট মুছে ফেলতে চান?')) return;
+        deletePost(post.id);
+      };
+      actions.appendChild(delBtn);
+    }
+
+    const divider = document.createElement('div'); divider.className='divider';
 
     const commentForm = document.createElement('form');
-    commentForm.onsubmit = (e) => {
-      e.preventDefault();
-      const input = commentForm.querySelector('input');
-      const text = input.value.trim();
-      if (!text) return;
-      postComment(post.id, text);
-      input.value = '';
-    };
+    commentForm.onsubmit = (e)=>{ e.preventDefault(); const input = commentForm.querySelector('input'); const text = input.value.trim(); if(!text) return; postComment(post.id, text); input.value=''; };
     const commentInput = document.createElement('input');
     commentInput.placeholder = 'Write a comment...';
     commentInput.style.width = '70%';
     commentForm.appendChild(commentInput);
-    const cBtn = document.createElement('button');
-    cBtn.textContent = 'Post';
-    commentForm.appendChild(cBtn);
+    const cBtn = document.createElement('button'); cBtn.textContent = 'Post'; commentForm.appendChild(cBtn);
 
-    const commentsDiv = document.createElement('div');
-    commentsDiv.className = 'comments';
+    const commentsDiv = document.createElement('div'); commentsDiv.className='comments';
     if (post.comments && post.comments.length) {
       post.comments.forEach(c => {
         const cEl = document.createElement('div');
         cEl.className = 'comment';
-        cEl.innerHTML = `<b>${escapeHtml(c.userId)}</b>: ${escapeHtml(c.text)}`;
+        const commenterName = escapeHtml(c.userName || c.userId || 'Anon');
+        const commenterIdPart = c.userId ? ` <small style="color:var(--muted)">${escapeHtml(c.userId)}</small>` : '';
+        cEl.innerHTML = `<b>${commenterName}</b>${commenterIdPart}: ${escapeHtml(c.text)}`;
         commentsDiv.appendChild(cEl);
       });
     }
@@ -231,66 +291,109 @@
     el.appendChild(commentForm);
     el.appendChild(commentsDiv);
 
+    // after building, attach click handler to user-id-link inside this element
+    const idLink = el.querySelector('.user-id-link');
+    if (idLink) {
+      idLink.addEventListener('click', (ev) => {
+        const uid = ev.currentTarget.getAttribute('data-userid');
+        if (uid) showProfile(uid);
+      });
+    }
+
     return el;
   }
 
-  function prependPostToFeed(post) {
+  function prependPostToFeed(post){
     const existing = document.getElementById('post-' + post.id);
     if (existing) existing.remove();
     const el = createPostElement(post);
     feedEl.insertAdjacentElement('afterbegin', el);
-    requestAnimationFrame(() => el.classList.add('show'));
-    microCelebrate();
   }
 
-  function refreshPostInDOM(postId, post) {
+  function refreshPostInDOM(postId, post){
     const container = document.getElementById('post-' + postId);
     if (!container) return;
     const newEl = createPostElement(post);
     container.replaceWith(newEl);
-    requestAnimationFrame(() => newEl.classList.add('show'));
   }
 
-  async function loadAndRenderFeed() {
+  /**
+   * loadAndRenderFeed(filter, opts)
+   *  - filter: string to match (partial)
+   *  - opts.partial: boolean (default true)
+   *  - opts.profile: boolean (if true, show profile styling)
+   */
+  async function loadAndRenderFeed(filter = null, opts = { partial: true, profile: false }){
     const posts = await getAllPostsFromDB();
+    let shown = posts;
+    if (filter) {
+      const q = filter.toLowerCase();
+      if (opts.partial) {
+        shown = posts.filter(p => ((p.userId||'').toLowerCase().includes(q) || (p.userName||'').toLowerCase().includes(q)));
+      } else {
+        shown = posts.filter(p => ((p.userId||'').toLowerCase() === q || (p.userName||'').toLowerCase() === q));
+      }
+      searchInfo.style.display = 'block';
+
+      // profile view: show profile header (stats) and make cards large
+      if (opts.profile) {
+        // profile should be exact match by userId or username (we expect userId here)
+        currentProfileViewUser = filter; // enable big-card style for this user's posts
+        const totalPosts = shown.length;
+        const totalLikes = shown.reduce((s,p)=> s + ((p.likes && p.likes.length) || 0), 0);
+        const totalComments = shown.reduce((s,p)=> s + ((p.comments && p.comments.length) || 0), 0);
+
+        searchInfo.innerHTML = `Profile: <span class="badge-profile">${escapeHtml(filter)}</span> <button class="back-btn" onclick="clearAndShowAll()">Back</button>
+          <div class="stat-row">
+            <div class="stat-item">Posts: ${totalPosts}</div>
+            <div class="stat-item">Likes: ${totalLikes}</div>
+            <div class="stat-item">Comments: ${totalComments}</div>
+          </div>`;
+      } else {
+        currentProfileViewUser = null;
+        searchInfo.innerHTML = `Search: <span class="badge-profile">${escapeHtml(filter)}</span> — ${shown.length} result(s) <button class="back-btn" onclick="clearAndShowAll()">Show all</button>`;
+      }
+    } else {
+      searchInfo.style.display = 'none';
+      searchInfo.textContent = '';
+      currentProfileViewUser = null;
+    }
+
     feedEl.innerHTML = '';
-    posts.forEach(p => {
-      const el = createPostElement(p);
-      feedEl.appendChild(el);
-      observer.observe(el);
-      requestAnimationFrame(() => el.classList.add('show'));
-    });
+    if (shown.length === 0) {
+      feedEl.innerHTML = `<div class="no-results">No posts found${filter? ' for ' + escapeHtml(filter):''}.</div>`;
+      return;
+    }
+    shown.forEach(p => feedEl.appendChild(createPostElement(p)));
   }
 
-  // IntersectionObserver for reveal-on-scroll
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('show'); });
-  }, { threshold: 0.06 });
+  // helper for Back / Show all from profile/info bar
+  window.clearAndShowAll = async function(){
+    searchInput.value = '';
+    currentProfileViewUser = null;
+    await loadAndRenderFeed();
+  };
 
-  // ---------- Socket event handlers (dedupe-aware) ----------
+  // ---------- Socket handlers ----------
   socket.on('sync', async (posts) => {
-    console.log('[SOCKET] sync received,', posts && posts.length, 'posts');
-    for (const p of posts) {
+    console.log('[SOCKET] sync received', posts && posts.length);
+    for (const p of posts || []) {
       try {
         const exists = await existsInDB(p.id);
         if (!exists) await savePostToDB(p);
-      } catch (err) {
-        console.error('sync: db err', err);
-      }
+      } catch (err){ console.error('sync db err', err); }
     }
     await loadAndRenderFeed();
   });
 
   socket.on('post', async (post) => {
     try {
+      if (!post) return;
       const exists = await existsInDB(post.id);
-      if (exists) {
-        console.log('[SOCKET] post skipped (already have)', post.id);
-        return;
-      }
+      if (exists) return;
       await savePostToDB(post);
       prependPostToFeed(post);
-    } catch (err) { console.error('[SOCKET] post handler err', err); }
+    } catch (err) { console.error('post handler err', err); }
   });
 
   socket.on('like', async (payload) => {
@@ -304,15 +407,15 @@
         post.likes = post.likes || [];
         if (payload.action === 'like') {
           const exists = post.likes.find(l => l.id === payload.likeId || l.userId === payload.userId);
-          if (!exists) post.likes.push({ id: payload.likeId, userId: payload.userId, created_at: payload.created_at });
+          if (!exists) post.likes.push({ id: payload.likeId, userId: payload.userId, userName: payload.userName || null, created_at: payload.created_at });
         } else {
           post.likes = post.likes.filter(l => l.id !== payload.likeId && l.userId !== payload.userId);
         }
         await updatePostInDB(post);
         refreshPostInDOM(post.id, post);
       };
-      req.onerror = (e) => console.error('like: db get err', e);
-    } catch (err) { console.error('[SOCKET] like handler err', err); }
+      req.onerror = (e)=> console.error('like db get err', e);
+    } catch (err){ console.error('like handler err', err); }
   });
 
   socket.on('comment', async (payload) => {
@@ -331,16 +434,25 @@
           refreshPostInDOM(post.id, post);
         }
       };
-      req.onerror = (e) => console.error('comment: db get err', e);
-    } catch (err) { console.error('[SOCKET] comment handler err', err); }
+      req.onerror = (e)=> console.error('comment db get err', e);
+    } catch (err){ console.error('comment handler err', err); }
   });
 
-  // ---------- App logic: upload / like / comment (client-side remains almost same) ----------
+  // handle delete coming from other clients/server
+  socket.on('delete_post', async (payload) => {
+    try {
+      if (!payload || !payload.postId) return;
+      await deletePostFromDB(payload.postId);
+      const el = document.getElementById('post-' + payload.postId);
+      if (el) el.remove();
+    } catch (err) { console.error('delete_post handler err', err); }
+  });
+
+  // ---------- App actions ----------
   document.getElementById('uploadForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const fileInput = document.getElementById('imageInput');
     const caption = document.getElementById('caption').value.trim();
-    const username = document.getElementById('username').value.trim() || 'Anonymous';
     const file = fileInput.files[0];
     if (!file) return alert('Choose an image first');
     if (file.size > 3*1024*1024) { if (!confirm('Image is large (>3MB). Continue?')) return; }
@@ -353,15 +465,19 @@
     });
 
     const post = {
-      id: uid(), userName: username, caption,
-      imageData: dataUrl, created_at: timeNow(), likes: [], comments: []
+      id: uid(),
+      userId: currentUserId,
+      userName: currentUser,
+      caption,
+      imageData: dataUrl,
+      created_at: timeNow(),
+      likes: [],
+      comments: []
     };
 
-    // local save + render
     await savePostToDB(post);
     prependPostToFeed(post);
 
-    // emit to server (server currently emits to all clients including sender)
     console.log('[EMIT] new_post', post.id);
     socket.emit('new_post', post);
 
@@ -369,11 +485,10 @@
     document.getElementById('caption').value = '';
   });
 
-  async function toggleLike(postId, btnEl) {
-    const user = document.getElementById('username').value.trim() || 'Anonymous';
+  async function toggleLike(postId, btnEl){
+    const userId = currentUserId;
+    const userName = currentUser;
     const likeId = uid();
-    const payload = { postId, userId: user, likeId, action: 'like', created_at: timeNow() };
-
     const db = await openDB();
     const tx = db.transaction(STORE,'readwrite');
     const store = tx.objectStore(STORE);
@@ -381,15 +496,17 @@
     req.onsuccess = async () => {
       const post = req.result; if (!post) return;
       post.likes = post.likes || [];
-      const existing = post.likes.find(l => l.userId === user);
+      const existing = post.likes.find(l => l.userId === userId);
       const countEl = btnEl.querySelector('.like-count');
+      const payload = { postId, userId, userName, likeId, action: 'like', created_at: timeNow() };
+
       if (existing) {
         payload.action = 'unlike';
         payload.likeId = existing.id;
-        post.likes = post.likes.filter(l => l.userId !== user);
+        post.likes = post.likes.filter(l => l.userId !== userId);
         btnEl.classList.remove('liked');
       } else {
-        post.likes.push({ id: likeId, userId: user, created_at: payload.created_at });
+        post.likes.push({ id: likeId, userId, userName, created_at: payload.created_at });
         btnEl.classList.add('liked');
       }
       countEl.textContent = post.likes.length;
@@ -397,14 +514,12 @@
       console.log('[EMIT] like', payload);
       socket.emit('like', payload);
     };
-    req.onerror = (e) => console.error('toggleLike: db get err', e);
+    req.onerror = (e)=> console.error('toggleLike db get err', e);
   }
 
-  async function postComment(postId, text) {
-    const user = document.getElementById('username').value.trim() || 'Anonymous';
-    const comment = { id: uid(), userId: user, text, created_at: timeNow() };
+  async function postComment(postId, text){
+    const comment = { id: uid(), userId: currentUserId, userName: currentUser, text, created_at: timeNow() };
     const payload = { postId, comment };
-
     const db = await openDB();
     const tx = db.transaction(STORE,'readwrite');
     const store = tx.objectStore(STORE);
@@ -418,21 +533,50 @@
       console.log('[EMIT] comment', payload);
       socket.emit('comment', payload);
     };
-    req.onerror = (e) => console.error('postComment: db get err', e);
+    req.onerror = (e)=> console.error('postComment db get err', e);
+  }
+  // call from client (replace existing socket.emit('delete_post', { postId }))
+socket.emit('delete_post', { postId, userId: currentUserId }, (res) => {
+  if (res && res.ok) {
+    // optionally remove locally (server will also broadcast delete_post)
+    const el = document.getElementById('post-' + postId);
+    if (el) el.remove();
+    alert('Post deleted');
+  } else {
+    alert('Delete failed: ' + (res?.reason || 'unknown'));
+  }
+});
+
+
+  // delete local post + emit
+  async function deletePost(postId){
+    try {
+      await deletePostFromDB(postId);
+      const el = document.getElementById('post-' + postId);
+      if (el) el.remove();
+      socket.emit('delete_post', { postId });
+      console.log('[EMIT] delete_post', postId);
+    } catch (err) { console.error('deletePost err', err); }
   }
 
-  // Tiny celebration burst on successful upload
-  function microCelebrate() {
-    const el = document.createElement('div');
-    Object.assign(el.style, { position: 'fixed', left: '50%', top: '72px', transform: 'translateX(-50%)', fontSize: '18px', pointerEvents: 'none', zIndex: 9999, opacity: 0, transition: 'all .8s ease' });
-    el.textContent = ['✨','🎉','💫','🌈','⚡','🎆'][Math.floor(Math.random()*6)];
-    document.body.appendChild(el);
-    requestAnimationFrame(() => { el.style.opacity = 1; el.style.top = '42px'; });
-    setTimeout(() => el.remove(), 900);
+  // ---------- Search & Profile ----------
+  async function performSearch(){
+    const q = (searchInput.value || '').trim();
+    if (!q) { await loadAndRenderFeed(); return; }
+    await loadAndRenderFeed(q, { partial: currentSearchPartial, profile: false });
+  }
+  searchBtn.addEventListener('click', performSearch);
+  searchInput.addEventListener('keydown', (e)=> { if (e.key === 'Enter'){ e.preventDefault(); performSearch(); }});
+  clearSearch.addEventListener('click', async ()=> { searchInput.value = ''; await loadAndRenderFeed(); });
+
+  // show profile view for a given userId (exact match on userId)
+  async function showProfile(userId){
+    searchInput.value = userId;
+    await loadAndRenderFeed(userId, { partial: false, profile: true });
   }
 
-  // Initial load
-  (async () => { await openDB(); await loadAndRenderFeed(); })();
+  // ---------- Initial load ----------
+  (async ()=> { await openDB(); await loadAndRenderFeed(); })();
   </script>
 </body>
 </html>
