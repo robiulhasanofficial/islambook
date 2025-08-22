@@ -54,6 +54,7 @@ io.on('connection', (socket) => {
     socket.broadcast.emit('comment', payload);
     socket.emit('comment', payload);
   });
+
   socket.on('disconnect', () => {
     console.log('socket disconnected', socket.id);
   });
