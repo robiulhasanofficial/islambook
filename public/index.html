@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="theme-color" content="#0ea5e9" />
-  <title>Mini Image Share — Partial Search + Profile (Enhanced)</title>
+  <title>Mini Image Share — Partial Search + Profile</title>
   <style>
     :root { --c1:#7c3aed; --c2:#0ea5e9; --bg:#0b1020; --text:#e5e7eb; --muted:#a8b3cf; --card:rgba(255,255,255,0.04); --radius:12px; --blur:14px; --speed:16s; }
     *{box-sizing:border-box} html,body{height:100%;margin:0;padding:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;color:var(--text);background:linear-gradient(135deg,#0b1020 0%,#05070f 100%);min-height:100vh}
@@ -24,13 +24,11 @@
     button.primary{padding:8px 12px;border-radius:999px;border:0;background:linear-gradient(90deg,var(--c1),var(--c2));color:#05070f;font-weight:700;cursor:pointer}
     #feed{margin-top:18px;display:grid;gap:14px}
     .post{padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.04);background:linear-gradient(180deg,rgba(255,255,255,0.01),rgba(255,255,255,0.005))}
-    .profile-post{padding:20px;border-radius:16px;border:1px solid rgba(255,255,255,0.06);background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));box-shadow:0 10px 30px rgba(0,0,0,0.6)}
     .meta{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px}
     .user-meta{display:flex;align-items:center;gap:8px}
     .user-meta small{color:var(--muted);font-size:12px}
     .user-id-link{cursor:pointer;color:var(--muted);font-size:12px;padding:4px;border-radius:6px}
     img.post-img{width:100%;border-radius:10px;margin-top:8px}
-    .profile-post img.post-img{border-radius:12px;max-height:620px;object-fit:cover}
     .actions{display:flex;gap:8px;margin-top:8px}
     .comments{margin-top:8px;font-size:14px;color:var(--text)}
     .comment{border-top:1px dashed rgba(255,255,255,0.02);padding-top:6px;margin-top:6px}
@@ -38,9 +36,6 @@
     .no-results{padding:18px;text-align:center;color:var(--muted)}
     .badge-profile{background:rgba(255,255,255,0.02);padding:6px 8px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);font-size:13px;margin-left:8px}
     .back-btn{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:6px 8px;border-radius:8px;color:var(--muted);cursor:pointer;margin-left:8px}
-    .stat-row{display:flex;gap:12px;align-items:center;margin-top:8px}
-    .stat-item{padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03);font-size:13px}
-    .small-btn{padding:6px 8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--muted);cursor:pointer}
   </style>
 </head>
 <body>
@@ -50,11 +45,10 @@
       <h1 class="title">Mini Image Share</h1>
 
       <div class="header-row">
-        <div class="search-wrap" title="Search by user name or ID">
-          <input id="searchInput" placeholder="Search name or ID" />
+        <div class="search-wrap" title="Search by user name or ID (partial OK)">
+          <input id="searchInput" placeholder="Search name or ID (partial OK)" />
           <button id="searchBtn">Search</button>
           <button id="clearSearch">Show all</button>
-          <button id="searchModeToggle" class="id-badge" title="Toggle exact / partial">Mode: partial</button>
         </div>
 
         <div style="display:flex;align-items:center">
@@ -164,15 +158,6 @@
     });
   }
   async function updatePostInDB(post){ return savePostToDB(post); }
-  async function deletePostFromDB(postId){
-    const db = await openDB();
-    return new Promise((res, rej) => {
-      const tx = db.transaction(STORE, 'readwrite');
-      tx.objectStore(STORE).delete(postId);
-      tx.oncomplete = ()=> res();
-      tx.onerror = ()=> rej(tx.error);
-    });
-  }
 
   // ---------- Utils ----------
   function uid(){ return (crypto && crypto.randomUUID) ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2,9); }
@@ -185,24 +170,11 @@
   const searchBtn = document.getElementById('searchBtn');
   const clearSearch = document.getElementById('clearSearch');
   const searchInfo = document.getElementById('searchInfo');
-  const searchModeToggle = document.getElementById('searchModeToggle');
-
-  // global state
-  let currentProfileViewUser = null; // when set, createPostElement will style posts bigger
-  let currentSearchPartial = true; // toggled by searchModeToggle
-
-  searchModeToggle.addEventListener('click', ()=>{
-    currentSearchPartial = !currentSearchPartial;
-    searchModeToggle.textContent = `Mode: ${currentSearchPartial? 'partial' : 'exact'}`;
-  });
 
   function createPostElement(post){
     const el = document.createElement('div');
     el.className = 'post';
     el.id = 'post-' + post.id;
-
-    // if we're in a profile view for this user, apply larger card style
-    if (currentProfileViewUser && post.userId === currentProfileViewUser) el.classList.add('profile-post');
 
     const meta = document.createElement('div');
     meta.className = 'meta';
@@ -248,18 +220,6 @@
 
     actions.appendChild(likeBtn);
     actions.appendChild(shareBtn);
-
-    // delete button if current user owns the post
-    if (post.userId === currentUserId) {
-      const delBtn = document.createElement('button');
-      delBtn.textContent = '🗑️ Delete';
-      delBtn.className = 'small-btn';
-      delBtn.onclick = () => {
-        if (!confirm('আপনি কি নিশ্চিত এই পোস্ট মুছে ফেলতে চান?')) return;
-        deletePost(post.id);
-      };
-      actions.appendChild(delBtn);
-    }
 
     const divider = document.createElement('div'); divider.className='divider';
 
@@ -334,29 +294,14 @@
         shown = posts.filter(p => ((p.userId||'').toLowerCase() === q || (p.userName||'').toLowerCase() === q));
       }
       searchInfo.style.display = 'block';
-
-      // profile view: show profile header (stats) and make cards large
       if (opts.profile) {
-        // profile should be exact match by userId or username (we expect userId here)
-        currentProfileViewUser = filter; // enable big-card style for this user's posts
-        const totalPosts = shown.length;
-        const totalLikes = shown.reduce((s,p)=> s + ((p.likes && p.likes.length) || 0), 0);
-        const totalComments = shown.reduce((s,p)=> s + ((p.comments && p.comments.length) || 0), 0);
-
-        searchInfo.innerHTML = `Profile: <span class="badge-profile">${escapeHtml(filter)}</span> <button class="back-btn" onclick="clearAndShowAll()">Back</button>
-          <div class="stat-row">
-            <div class="stat-item">Posts: ${totalPosts}</div>
-            <div class="stat-item">Likes: ${totalLikes}</div>
-            <div class="stat-item">Comments: ${totalComments}</div>
-          </div>`;
+        searchInfo.innerHTML = `Profile: <span class="badge-profile">${escapeHtml(filter)}</span> <button class="back-btn" onclick="clearAndShowAll()">Back</button> — ${shown.length} post(s)`;
       } else {
-        currentProfileViewUser = null;
         searchInfo.innerHTML = `Search: <span class="badge-profile">${escapeHtml(filter)}</span> — ${shown.length} result(s) <button class="back-btn" onclick="clearAndShowAll()">Show all</button>`;
       }
     } else {
       searchInfo.style.display = 'none';
       searchInfo.textContent = '';
-      currentProfileViewUser = null;
     }
 
     feedEl.innerHTML = '';
@@ -370,7 +315,6 @@
   // helper for Back / Show all from profile/info bar
   window.clearAndShowAll = async function(){
     searchInput.value = '';
-    currentProfileViewUser = null;
     await loadAndRenderFeed();
   };
 
@@ -436,16 +380,6 @@
       };
       req.onerror = (e)=> console.error('comment db get err', e);
     } catch (err){ console.error('comment handler err', err); }
-  });
-
-  // handle delete coming from other clients/server
-  socket.on('delete_post', async (payload) => {
-    try {
-      if (!payload || !payload.postId) return;
-      await deletePostFromDB(payload.postId);
-      const el = document.getElementById('post-' + payload.postId);
-      if (el) el.remove();
-    } catch (err) { console.error('delete_post handler err', err); }
   });
 
   // ---------- App actions ----------
@@ -535,42 +469,21 @@
     };
     req.onerror = (e)=> console.error('postComment db get err', e);
   }
-  // call from client (replace existing socket.emit('delete_post', { postId }))
-socket.emit('delete_post', { postId, userId: currentUserId }, (res) => {
-  if (res && res.ok) {
-    // optionally remove locally (server will also broadcast delete_post)
-    const el = document.getElementById('post-' + postId);
-    if (el) el.remove();
-    alert('Post deleted');
-  } else {
-    alert('Delete failed: ' + (res?.reason || 'unknown'));
-  }
-});
-
-
-  // delete local post + emit
-  async function deletePost(postId){
-    try {
-      await deletePostFromDB(postId);
-      const el = document.getElementById('post-' + postId);
-      if (el) el.remove();
-      socket.emit('delete_post', { postId });
-      console.log('[EMIT] delete_post', postId);
-    } catch (err) { console.error('deletePost err', err); }
-  }
 
   // ---------- Search & Profile ----------
   async function performSearch(){
     const q = (searchInput.value || '').trim();
     if (!q) { await loadAndRenderFeed(); return; }
-    await loadAndRenderFeed(q, { partial: currentSearchPartial, profile: false });
+    // partial by default
+    await loadAndRenderFeed(q, { partial: true, profile: false });
   }
   searchBtn.addEventListener('click', performSearch);
   searchInput.addEventListener('keydown', (e)=> { if (e.key === 'Enter'){ e.preventDefault(); performSearch(); }});
   clearSearch.addEventListener('click', async ()=> { searchInput.value = ''; await loadAndRenderFeed(); });
 
-  // show profile view for a given userId (exact match on userId)
+  // show profile view for a given userId (exact match on userId but partial results also OK)
   async function showProfile(userId){
+    // set the search input for convenience
     searchInput.value = userId;
     await loadAndRenderFeed(userId, { partial: false, profile: true });
   }
