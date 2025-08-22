@@ -1,64 +1,66 @@
 // server.js
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const path = require('path');
+const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
+const cors = require("cors");
 
 const app = express();
+app.use(cors());
+
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: [
-      "https://islambook.onrender.com",       // নিজের domain
-      "https://robiulhasanofficial.github.io" // GitHub Pages domain root
-    ],
+    origin: "*", // প্রয়োজনে শুধু তোমার সাইটের origin বসাও
     methods: ["GET", "POST"]
   }
 });
 
-// optional in-memory cache of recent posts (no DB)
-const POSTS_CACHE = []; // keep small, e.g., last 200
+// সব ডাটা ইন-মেমোরিতে রাখা (প্রয়োজনে DB যুক্ত করা যাবে)
+let posts = [];
+let messages = []; // নতুন: গ্রুপ চ্যাট মেসেজ
 
-// serve client from /public folder
-app.use(express.static(path.join(__dirname, 'public')));
+io.on("connection", (socket) => {
+  console.log("⚡ User connected:", socket.id);
 
-io.on('connection', (socket) => {
-  console.log('socket connected', socket.id);
-
-  // যখন ক্লায়েন্ট connect হবে তখন sync চাইলে cache পাঠাও
-  socket.on('request_sync', () => {
-    socket.emit('sync', POSTS_CACHE);
+  // নতুন ইউজার এলে তাদেরকে আগের সব পোস্ট পাঠানো
+  socket.on("request_sync", () => {
+    socket.emit("sync", posts);
   });
 
-  // নতুন পোস্ট এলে
-  socket.on('new_post', (post) => {
-    console.log('[RECV] new_post', post.id);
-
-    // cache এ রাখো
-    POSTS_CACHE.push(post);
-    if (POSTS_CACHE.length > 300) POSTS_CACHE.shift();
-
-    // 🔥 fix: sender + অন্য সব ক্লায়েন্টে পাঠানো
-    socket.broadcast.emit('post', post);
-    socket.emit('post', post); 
+  // নতুন ইউজার এলে আগের সব মেসেজ পাঠানো
+  socket.on("request_messages", () => {
+    socket.emit("messages_sync", messages);
   });
 
-  // লাইক ইভেন্ট
-  socket.on('like', (payload) => {
-    socket.broadcast.emit('like', payload);
-    socket.emit('like', payload);
+  // নতুন পোস্ট
+  socket.on("post", (post) => {
+    posts.unshift(post);
+    io.emit("post", post);
   });
 
-  // কমেন্ট ইভেন্ট
-  socket.on('comment', (payload) => {
-    socket.broadcast.emit('comment', payload);
-    socket.emit('comment', payload);
+  // লাইক / আনলাইক
+  socket.on("like", (payload) => {
+    io.emit("like", payload);
   });
 
-  socket.on('disconnect', () => {
-    console.log('socket disconnected', socket.id);
+  // কমেন্ট
+  socket.on("comment", (payload) => {
+    io.emit("comment", payload);
+  });
+
+  // নতুন মেসেজ (গ্রুপ চ্যাট)
+  socket.on("message", (msg) => {
+    messages.push(msg);
+    io.emit("message", msg); // সবাইকে পাঠানো
+  });
+
+  socket.on("disconnect", () => {
+    console.log("❌ User disconnected:", socket.id);
   });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server listening on http://localhost:${PORT}`));
+// সার্ভার চালানো
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => {
+  console.log(`🚀 Server listening on http://localhost:${PORT}`);
+});
