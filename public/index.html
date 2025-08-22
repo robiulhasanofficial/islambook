@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="theme-color" content="#0ea5e9" />
-  <title>Mini Image Share — Responsive · Polished Viewer</title>
+  <title>Mini Image Share — Responsive · Polished Viewer (Comments Enabled)</title>
   <style>
     :root{
       --c1:#7c3aed; --c2:#0ea5e9; --bg:#0b1020; --card:#071028; --text:#e5e7eb; --muted:#9aa4bf;
@@ -46,6 +46,16 @@
     .caption{font-size:14px;color:var(--text);min-height:1.1em}
     .actions{display:flex;gap:8px;align-items:center}
     .lb-small-btn{padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03);color:var(--muted);cursor:pointer}
+
+    /* Comments */
+    .comments{margin-top:8px;display:flex;flex-direction:column;gap:8px}
+    .comment-item{font-size:13px;color:var(--muted);background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.02)}
+    .comment-form{display:flex;gap:8px;align-items:center;margin-top:6px}
+    .comment-form input{flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.01);color:var(--text)}
+    .comment-form button{padding:8px 10px;border-radius:8px;border:0;background:var(--accent);color:#05070f;font-weight:600;cursor:pointer}
+
+    /* comment count visual */
+    .lb-small-btn .comment-count{ margin-left:6px; font-weight:700; color:var(--text); }
 
     /* Lightbox / viewer (improved) */
     .lightbox-overlay{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;background:linear-gradient(180deg, rgba(2,6,23,0.9), rgba(2,6,23,0.95))}
@@ -127,7 +137,7 @@
         <button id="resetZoom" class="lb-btn" title="Reset zoom">○</button>
         <button id="closeLBox" class="lb-btn" title="Close viewer">✕</button>
       </div>
-      <div id="lbHint" class="lb-hint">Pinch • Double‑tap • Drag</div>
+      <div id="lbHint" class="lb-hint">Pinch • Double-tap • Drag</div>
       <div id="lbCaption" class="lb-caption"></div>
     </div>
   </div>
@@ -145,9 +155,61 @@
   const socket = io("https://islambook.onrender.com", { transports: ['websocket','polling'] });
   socket.on('connect', () => { console.log('[SOCKET] connected', socket.id); socket.emit('request_sync'); });
 
-  // IndexedDB helpers (unchanged)
+  // IndexedDB helpers (updated to gracefully handle VersionError)
   const DB_NAME = 'mini_social_v1'; const STORE = 'posts'; let dbPromise = null;
-  function openDB(){ if(dbPromise) return dbPromise; dbPromise = new Promise((res, rej) => { const req = indexedDB.open(DB_NAME, 1); req.onupgradeneeded = (e) => { const db = e.target.result; if (!db.objectStoreNames.contains(STORE)) { const store = db.createObjectStore(STORE, { keyPath: 'id' }); store.createIndex('created_at', 'created_at'); store.createIndex('userId', 'userId'); } }; req.onsuccess = ()=> res(req.result); req.onerror = ()=> rej(req.error); }); return dbPromise; }
+  const DEFAULT_DB_VERSION = 1; // bump this if you intentionally change schema
+
+  function openDB(){
+    if(dbPromise) return dbPromise;
+    dbPromise = new Promise((res, rej) => {
+      let triedDelete = false;
+
+      const setupObjectStore = (db) => {
+        if (!db.objectStoreNames.contains(STORE)) {
+          const store = db.createObjectStore(STORE, { keyPath: 'id' });
+          store.createIndex('created_at', 'created_at');
+          store.createIndex('userId', 'userId');
+        }
+      };
+
+      const attempt = (version) => {
+        const req = indexedDB.open(DB_NAME, version);
+
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          try{ setupObjectStore(db); }catch(err){ console.error('[DB] upgrade error', err); }
+        };
+
+        req.onsuccess = () => {
+          const db = req.result;
+          // Close if another tab triggers a versionchange
+          db.onversionchange = () => { db.close(); console.warn('[DB] connection closed due to versionchange'); };
+          res(db);
+        };
+
+        req.onerror = (e) => {
+          const err = e.target && e.target.error;
+          // If version mismatch happens (requested version < existing), attempt to delete DB and retry.
+          if (err && err.name === 'VersionError' && !triedDelete) {
+            triedDelete = true;
+            console.warn('[DB] VersionError detected — deleting existing DB and retrying (development fallback).');
+            const del = indexedDB.deleteDatabase(DB_NAME);
+            del.onsuccess = () => { console.warn('[DB] deleted old DB — retrying open'); attempt(version); };
+            del.onerror = () => { dbPromise = null; rej(del.error || new Error('Failed to delete DB')); };
+            del.onblocked = () => { dbPromise = null; rej(new Error('Delete blocked — close other tabs using the DB')); };
+          } else {
+            // Reset dbPromise so future calls can try again
+            dbPromise = null;
+            rej(err || e);
+          }
+        };
+      };
+
+      attempt(DEFAULT_DB_VERSION);
+    });
+    return dbPromise;
+  }
+
   async function savePostToDB(post){ const db = await openDB(); return new Promise((res, rej) => { const tx = db.transaction(STORE, 'readwrite'); tx.objectStore(STORE).put(post); tx.oncomplete = ()=> res(); tx.onerror = ()=> rej(tx.error); }); }
   async function existsInDB(postId){ const db = await openDB(); return new Promise((res, rej) => { const tx = db.transaction(STORE,'readonly'); const req = tx.objectStore(STORE).get(postId); req.onsuccess = ()=> res(!!req.result); req.onerror = ()=> rej(req.error); }); }
   async function getAllPostsFromDB(){ const db = await openDB(); return new Promise((res, rej) => { const tx = db.transaction(STORE,'readonly'); const req = tx.objectStore(STORE).getAll(); req.onsuccess = ()=> res(req.result.sort((a,b)=> new Date(b.created_at) - new Date(a.created_at))); req.onerror = ()=> rej(req.error); }); }
@@ -199,6 +261,21 @@
   // ---------- UI: render feed with nicer cards and accessibility ----------
   const feedEl = document.getElementById('feed'); const searchInput = document.getElementById('searchInput'); const searchBtn = document.getElementById('searchBtn'); const clearSearch = document.getElementById('clearSearch'); const searchInfo = document.getElementById('searchInfo');
 
+  function renderComments(container, comments){
+    container.innerHTML = '';
+    if(!comments || comments.length === 0){
+      container.innerHTML = "<div style='opacity:0.75'>কোনো কমেন্ট নেই</div>";
+      return;
+    }
+    comments.forEach(c=>{
+      const div = document.createElement('div');
+      div.className = 'comment-item';
+      div.innerHTML = `<strong>${escapeHtml(c.userName||'Anon')}:</strong> ${escapeHtml(c.text)}`;
+      container.appendChild(div);
+    });
+  }
+
+  // ---------- UPDATED createPostElement: shows comment-count beside the comment toggle ----------
   function createPostElement(post){
     const el = document.createElement('article'); el.className='post'; el.id='post-'+post.id; el.setAttribute('tabindex','0');
     const meta = document.createElement('div'); meta.className='meta';
@@ -214,10 +291,50 @@
 
     const actions = document.createElement('div'); actions.className='actions';
     const likeBtn = document.createElement('button'); likeBtn.className='lb-small-btn'; likeBtn.innerHTML = `🤍 <span class="like-count">${(post.likes||[]).length}</span>`; likeBtn.onclick = ()=> toggleLike(post.id, likeBtn);
-    const shareBtn = document.createElement('button'); shareBtn.className='lb-small-btn'; shareBtn.textContent='Share'; shareBtn.onclick = ()=> { if(navigator.share){ navigator.share({title:post.caption||'Image',text:post.caption||'',url:post.imageData}).catch(()=>{}); } else window.open(post.imageData,'_blank'); };
-    actions.appendChild(likeBtn); actions.appendChild(shareBtn);
 
+    // Comment toggle button now includes a comment-count span
+    const commentToggle = document.createElement('button'); commentToggle.className='lb-small-btn';
+    const commentCount = (post.comments || []).length;
+    commentToggle.innerHTML = `💬 <span class="comment-count">${commentCount}</span>`;
+    commentToggle.title='Show comments';
+
+    actions.appendChild(likeBtn); actions.appendChild(commentToggle);
+
+    // comment list + form
+    const commentsWrap = document.createElement('div'); commentsWrap.className='comments';
+    const commentsList = document.createElement('div'); commentsList.className='comments-list';
+    renderComments(commentsList, post.comments||[]);
+    commentsWrap.appendChild(commentsList);
+
+    const commentForm = document.createElement('form'); commentForm.className='comment-form'; commentForm.style.display='none'; commentsWrap.style.display='none';
+    const commentInput = document.createElement('input'); commentInput.type='text'; commentInput.placeholder='কমেন্ট লিখুন...'; commentInput.setAttribute('aria-label','Write a comment');
+    const commentSubmit = document.createElement('button'); commentSubmit.type='submit'; commentSubmit.textContent='Send';
+    commentForm.appendChild(commentInput); commentForm.appendChild(commentSubmit);
+
+    commentForm.addEventListener('submit', (ev)=>{
+      ev.preventDefault(); const text = commentInput.value.trim(); if(!text) return; commentSubmit.disabled = true;
+      postComment(post.id, text).then(()=> {
+        // quick local increment for immediate UI feedback; DB/socket will bring canonical state soon
+        const span = commentToggle.querySelector('.comment-count');
+        if(span) span.textContent = (parseInt(span.textContent||'0',10) + 1);
+      }).finally(()=> { commentInput.value=''; setTimeout(()=> commentSubmit.disabled = false, 300); });
+    });
+
+    commentToggle.addEventListener('click', ()=>{
+      const isHidden = commentsWrap.style.display === 'none';
+      commentsWrap.style.display = isHidden ? 'flex' : 'none';
+      commentForm.style.display = isHidden ? 'flex' : 'none';
+      commentToggle.title = isHidden ? 'Hide comments' : 'Show comments';
+      // if opening, ensure comments are up-to-date (socket will update when new comments arrive)
+      if(isHidden){
+        renderComments(commentsList, post.comments||[]);
+      }
+    });
+
+    // assemble
     el.appendChild(meta); el.appendChild(frame); el.appendChild(caption); el.appendChild(actions);
+    el.appendChild(commentsWrap);
+    el.appendChild(commentForm);
 
     return el;
   }
