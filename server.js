@@ -2,50 +2,63 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const cors = require('cors');
+const path = require('path');
 
 const app = express();
-app.use(cors()); // prod-এ origin সীমাবদ্ধ করবে
-app.use(express.json());
-app.use(express.static('public')); // যদি তুমি client ফাইল সার্ভ করুন; নাহলে অপশনাল
-
 const server = http.createServer(app);
-
-// cors options: production-এ specific origin লিখবে
 const io = new Server(server, {
-  cors: { origin: '*' }
+  cors: {
+    origin: [
+      "https://islambook.onrender.com",       // নিজের domain
+      "https://robiulhasanofficial.github.io" // GitHub Pages domain root
+    ],
+    methods: ["GET", "POST"]
+  }
 });
 
-// Simple in-memory store (restart এ হারাবে). পরবর্তীতে DB ব্যবহার করো।
-let lastFull = { list: [], lastUpdated: 0 };
+// optional in-memory cache of recent posts (no DB)
+const POSTS_CACHE = []; // keep small, e.g., last 200
+
+// serve client from /public folder
+app.use(express.static(path.join(__dirname, 'public')));
 
 io.on('connection', (socket) => {
-  console.log('socket connected:', socket.id);
+  console.log('socket connected', socket.id);
 
-  socket.on('orders:hello', (data) => {
-    // যদি সার্ভারে নতুন ডেটা থাকে, ক্লায়েন্টকে পাঠানো হবে
-    try {
-      if(lastFull.lastUpdated > (data.lastUpdated || 0)){
-        socket.emit('orders:full', lastFull);
-      }
-    } catch(e){ console.error(e); }
+  // যখন ক্লায়েন্ট connect হবে তখন sync চাইলে cache পাঠাও
+  socket.on('request_sync', () => {
+    socket.emit('sync', POSTS_CACHE);
   });
 
-  socket.on('orders:sync', (payload) => {
-    try {
-      // update server memory if payload is newer
-      if(payload.lastUpdated && payload.lastUpdated > lastFull.lastUpdated){
-        lastFull = { list: payload.list || [], lastUpdated: payload.lastUpdated };
-      }
-      // broadcast to other clients (not back to sender)
-      socket.broadcast.emit('orders:sync', payload);
-    } catch(e){ console.error(e); }
+  // নতুন পোস্ট এলে
+  socket.on('new_post', (post) => {
+    console.log('[RECV] new_post', post.id);
+
+    // cache এ রাখো
+    POSTS_CACHE.push(post);
+    if (POSTS_CACHE.length > 300) POSTS_CACHE.shift();
+
+    // 🔥 fix: sender + অন্য সব ক্লায়েন্টে পাঠানো
+    socket.broadcast.emit('post', post);
+    socket.emit('post', post); 
   });
 
-  socket.on('disconnect', ()=> {
-    console.log('socket disconnected:', socket.id);
+  // লাইক ইভেন্ট
+  socket.on('like', (payload) => {
+    socket.broadcast.emit('like', payload);
+    socket.emit('like', payload);
+  });
+
+  // কমেন্ট ইভেন্ট
+  socket.on('comment', (payload) => {
+    socket.broadcast.emit('comment', payload);
+    socket.emit('comment', payload);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('socket disconnected', socket.id);
   });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, ()=> console.log(`Server listening on ${PORT}`));
+server.listen(PORT, () => console.log(`Server listening on http://localhost:${PORT}`));

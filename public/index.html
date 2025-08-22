@@ -6,218 +6,49 @@
   <meta name="theme-color" content="#0ea5e9" />
   <title>Mini Image Share (No DB) — Ultra Animated</title>
   <style>
-    /* ===================
-       Ultra-modern, colorful, mobile-aware animations
-       — zero frameworks, tiny CSS-only effects
-       =================== */
-
-    :root {
-      /* Neon gradient palette */
-      --c1: #7c3aed; /* violet */
-      --c2: #0ea5e9; /* sky */
-      --c3: #10b981; /* emerald */
-      --c4: #f59e0b; /* amber */
-      --bg: #0b1020; /* deep space */
-      --card: rgba(255,255,255,0.08);
-      --card-strong: rgba(255,255,255,0.14);
-      --text: #e5e7eb;
-      --muted: #a8b3cf;
-      --ring: rgba(14,165,233,0.6);
-      --shadow: 0 10px 30px rgba(0,0,0,0.35);
-      --radius: 18px;
-      --blur: 16px;
-      --speed: 16s; /* global animation speed */
-    }
-
-    /* Mobile: alternate palette & motion tuning */
-    @media (max-width: 640px) {
-      :root {
-        --c1: #22d3ee; /* cyan */
-        --c2: #f472b6; /* pink */
-        --c3: #a3e635; /* lime */
-        --c4: #f97316; /* orange */
-        --speed: 12s;
-      }
-    }
-
-    /* Accessibility: reduce motion respectfully */
-    @media (prefers-reduced-motion: reduce) {
-      :root { --speed: 0s; }
-      .floaty, .pulse, .spin, .pan, .rise, .shimmer { animation: none !important; }
-      .reveal { transform: none !important; opacity: 1 !important; }
-    }
-
-    /* Global reset */
+    /* (styling identical to your original file) */
+    :root { --c1: #7c3aed; --c2: #0ea5e9; --c3: #10b981; --c4: #f59e0b; --bg: #0b1020; --card: rgba(255,255,255,0.08); --card-strong: rgba(255,255,255,0.14); --text: #e5e7eb; --muted: #a8b3cf; --ring: rgba(14,165,233,0.6); --shadow: 0 10px 30px rgba(0,0,0,0.35); --radius: 18px; --blur: 16px; --speed: 16s; }
+    @media (max-width: 640px) { :root { --c1: #22d3ee; --c2: #f472b6; --c3: #a3e635; --c4: #f97316; --speed: 12s; } }
+    @media (prefers-reduced-motion: reduce) { :root { --speed: 0s; } .floaty, .pulse, .spin, .pan, .rise, .shimmer { animation: none !important; } .reveal { transform: none !important; opacity: 1 !important; } }
     * { box-sizing: border-box; }
-    html, body { height: 100%; }
-    html, body { margin:0; padding:0; }
-
-    /* Animated gradient cosmos background */
-    body {
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-      color: var(--text);
-      background: radial-gradient(1200px 800px at 10% 10%, rgba(124,58,237,0.20), transparent 60%),
-                  radial-gradient(1200px 800px at 90% 20%, rgba(14,165,233,0.20), transparent 60%),
-                  radial-gradient(1200px 800px at 50% 90%, rgba(16,185,129,0.18), transparent 60%),
-                  linear-gradient(135deg, #0b1020 0%, #05070f 100%);
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    /* Floating color blobs (subtle) */
-    .bg-blobs::before,
-    .bg-blobs::after {
-      content: "";
-      position: fixed;
-      inset: auto auto 10% -10%;
-      width: 60vmax; height: 60vmax;
-      background: radial-gradient(circle at 30% 30%, var(--c1), transparent 50%),
-                  radial-gradient(circle at 70% 60%, var(--c2), transparent 45%),
-                  radial-gradient(circle at 40% 80%, var(--c3), transparent 40%);
-      filter: blur(60px) saturate(140%);
-      opacity: 0.35;
-      z-index: -1;
-      transform: translate3d(0,0,0);
-      animation: blobs var(--speed) ease-in-out infinite alternate;
-    }
-    .bg-blobs::after {
-      inset: -15% -10% auto auto;
-      transform: translate3d(0,0,0) rotate(8deg);
-      opacity: 0.28;
-      animation-duration: calc(var(--speed) * 1.3);
-    }
-    @keyframes blobs {
-      from { transform: translate3d(-4%, 2%, 0) scale(1); }
-      to   { transform: translate3d(3%, -3%, 0) scale(1.05); }
-    }
-
-    /* Layout container */
+    html, body { height: 100%; margin:0; padding:0; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji"; color: var(--text); background: radial-gradient(1200px 800px at 10% 10%, rgba(124,58,237,0.20), transparent 60%), radial-gradient(1200px 800px at 90% 20%, rgba(14,165,233,0.20), transparent 60%), radial-gradient(1200px 800px at 50% 90%, rgba(16,185,129,0.18), transparent 60%), linear-gradient(135deg, #0b1020 0%, #05070f 100%); min-height: 100vh; overflow-x: hidden; }
+    .bg-blobs::before, .bg-blobs::after { content: ""; position: fixed; inset: auto auto 10% -10%; width: 60vmax; height: 60vmax; background: radial-gradient(circle at 30% 30%, var(--c1), transparent 50%), radial-gradient(circle at 70% 60%, var(--c2), transparent 45%), radial-gradient(circle at 40% 80%, var(--c3), transparent 40%); filter: blur(60px) saturate(140%); opacity: 0.35; z-index: -1; transform: translate3d(0,0,0); animation: blobs var(--speed) ease-in-out infinite alternate; }
+    .bg-blobs::after { inset: -15% -10% auto auto; transform: translate3d(0,0,0) rotate(8deg); opacity: 0.28; animation-duration: calc(var(--speed) * 1.3); }
+    @keyframes blobs { from { transform: translate3d(-4%, 2%, 0) scale(1); } to { transform: translate3d(3%, -3%, 0) scale(1.05); } }
     .wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 80px; position: relative; }
-
-    /* Header: neon gradient title + glass toolbar */
-    header.app {
-      display:flex; align-items:center; gap:14px; position: sticky; top: 0; z-index: 50;
-      padding: 14px 16px; margin: 12px 0 18px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
-      -webkit-backdrop-filter: blur(var(--blur)); backdrop-filter: blur(var(--blur));
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: calc(var(--radius) + 6px);
-      box-shadow: var(--shadow);
-    }
-    .logo {
-      width: 40px; height: 40px; border-radius: 12px; position: relative; overflow: hidden;
-      background: conic-gradient(from 0deg, var(--c1), var(--c2), var(--c3), var(--c4), var(--c1));
-      animation: spin var(--speed) linear infinite;
-    }
+    header.app { display:flex; align-items:center; gap:14px; position: sticky; top: 0; z-index: 50; padding: 14px 16px; margin: 12px 0 18px; background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); -webkit-backdrop-filter: blur(var(--blur)); backdrop-filter: blur(var(--blur)); border: 1px solid rgba(255,255,255,0.12); border-radius: calc(var(--radius) + 6px); box-shadow: var(--shadow); }
+    .logo { width: 40px; height: 40px; border-radius: 12px; position: relative; overflow: hidden; background: conic-gradient(from 0deg, var(--c1), var(--c2), var(--c3), var(--c4), var(--c1)); animation: spin var(--speed) linear infinite; }
     @keyframes spin { to { transform: rotate(1turn); } }
-
-    h1.title {
-      font-size: clamp(20px, 3vw, 28px); line-height: 1.1; margin: 0; letter-spacing: 0.3px;
-      background: linear-gradient(90deg, var(--c1), var(--c2), var(--c3), var(--c4));
-      -webkit-background-clip: text; background-clip: text; color: transparent;
-      filter: drop-shadow(0 2px 12px rgba(14,165,233,0.35));
-    }
-
+    h1.title { font-size: clamp(20px, 3vw, 28px); line-height: 1.1; margin: 0; letter-spacing: 0.3px; background: linear-gradient(90deg, var(--c1), var(--c2), var(--c3), var(--c4)); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 2px 12px rgba(14,165,233,0.35)); }
     .userbox { margin-left:auto; display:flex; align-items:center; gap:10px; }
-    .userbox input {
-      width: 150px; max-width: 42vw; color: var(--text);
-      background: var(--card);
-      border: 1px solid rgba(255,255,255,0.14);
-      border-radius: 12px; padding: 10px 12px; outline: none;
-      transition: box-shadow .2s ease, transform .2s ease, border-color .2s ease;
-    }
-    .userbox input:focus {
-      border-color: var(--ring); box-shadow: 0 0 0 6px rgba(14,165,233,0.15);
-      transform: translateY(-1px);
-    }
-
-    /* Uploader card */
-    .card {
-      background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
-      -webkit-backdrop-filter: blur(var(--blur)); backdrop-filter: blur(var(--blur));
-      border: 1px solid rgba(255,255,255,0.16);
-      border-radius: var(--radius);
-      padding: 16px; box-shadow: var(--shadow);
-      position: relative; overflow: hidden;
-    }
-    .card::after {
-      content:""; position:absolute; inset: -2px; z-index:-1; border-radius: inherit;
-      background: conic-gradient(from 0deg, transparent 0 25%, rgba(255,255,255,0.08) 30% 50%, transparent 55% 100%);
-      animation: pan calc(var(--speed) * 1.2) linear infinite;
-      filter: blur(12px);
-    }
+    .userbox input { width: 150px; max-width: 42vw; color: var(--text); background: var(--card); border: 1px solid rgba(255,255,255,0.14); border-radius: 12px; padding: 10px 12px; outline: none; transition: box-shadow .2s ease, transform .2s ease, border-color .2s ease; }
+    .userbox input:focus { border-color: var(--ring); box-shadow: 0 0 0 6px rgba(14,165,233,0.15); transform: translateY(-1px); }
+    .card { background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04)); -webkit-backdrop-filter: blur(var(--blur)); backdrop-filter: blur(var(--blur)); border: 1px solid rgba(255,255,255,0.16); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
+    .card::after { content:""; position:absolute; inset: -2px; z-index:-1; border-radius: inherit; background: conic-gradient(from 0deg, transparent 0 25%, rgba(255,255,255,0.08) 30% 50%, transparent 55% 100%); animation: pan calc(var(--speed) * 1.2) linear infinite; filter: blur(12px); }
     @keyframes pan { to { transform: rotate(1turn); } }
-
     form#uploadForm { display:flex; flex-wrap: wrap; gap:10px; align-items:center; }
-    input[type="file"], input[type="text"] {
-      color: var(--text); background: var(--card);
-      border: 1px solid rgba(255,255,255,0.14);
-      border-radius: 12px; padding: 10px 12px; outline: none;
-    }
+    input[type="file"], input[type="text"] { color: var(--text); background: var(--card); border: 1px solid rgba(255,255,255,0.14); border-radius: 12px; padding: 10px 12px; outline: none; }
     input[type="text"] { flex: 1 1 260px; }
-
-    button {
-      cursor:pointer; border:0; padding: 10px 14px; border-radius: 999px; font-weight: 600;
-      color: #0b1020; background: linear-gradient(90deg, var(--c1), var(--c2), var(--c3));
-      transition: transform .15s ease, box-shadow .15s ease, filter .2s ease;
-      box-shadow: 0 10px 20px rgba(14,165,233,0.28);
-      position: relative; overflow: hidden;
-    }
-    button:hover { transform: translateY(-1px); }
-    button:active { transform: translateY(0) scale(0.98); }
-    button .shimmer {
-      content: ""; position:absolute; inset:0; pointer-events:none;
-      background: linear-gradient(120deg, transparent 0 40%, rgba(255,255,255,0.5) 50%, transparent 60% 100%);
-      transform: translateX(-100%);
-      animation: shimmer calc(var(--speed) * 0.6) ease-in-out infinite;
-    }
+    button { cursor:pointer; border:0; padding: 10px 14px; border-radius: 999px; font-weight: 600; color: #0b1020; background: linear-gradient(90deg, var(--c1), var(--c2), var(--c3)); transition: transform .15s ease, box-shadow .15s ease, filter .2s ease; box-shadow: 0 10px 20px rgba(14,165,233,0.28); position: relative; overflow: hidden; }
+    button:hover { transform: translateY(-1px); } button:active { transform: translateY(0) scale(0.98); }
+    button .shimmer { content: ""; position:absolute; inset:0; pointer-events:none; background: linear-gradient(120deg, transparent 0 40%, rgba(255,255,255,0.5) 50%, transparent 60% 100%); transform: translateX(-100%); animation: shimmer calc(var(--speed) * 0.6) ease-in-out infinite; }
     @keyframes shimmer { to { transform: translateX(100%); } }
-
     small#uploadNote { color: var(--muted); }
-
-    /* Feed grid */
     #feed { margin-top:18px; display:grid; grid-template-columns: 1fr; gap: 16px; }
     @media (min-width: 720px) { #feed { grid-template-columns: 1fr; } }
-
-    /* Post card */
-    .post {
-      background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
-      -webkit-backdrop-filter: blur(var(--blur)); backdrop-filter: blur(var(--blur));
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: var(--radius);
-      padding: 12px; box-shadow: var(--shadow);
-      transform: translateY(6px) scale(0.98);
-      opacity: 0; /* will be revealed via IntersectionObserver */
-      transition: transform .5s cubic-bezier(.21, .61, .35, 1), opacity .5s ease;
-    }
+    .post { background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04)); -webkit-backdrop-filter: blur(var(--blur)); backdrop-filter: blur(var(--blur)); border: 1px solid rgba(255,255,255,0.12); border-radius: var(--radius); padding: 12px; box-shadow: var(--shadow); transform: translateY(6px) scale(0.98); opacity: 0; transition: transform .5s cubic-bezier(.21, .61, .35, 1), opacity .5s ease; }
     .post.show { transform: translateY(0) scale(1); opacity: 1; }
-
     .meta { display:flex; justify-content:space-between; gap:10px; font-size:13px; color:var(--muted); }
-
-    img.post-img { width: 100%; height: auto; border-radius: 12px; margin-top:8px;
-      outline: 1px solid rgba(255,255,255,0.1);
-      transition: transform .4s ease, filter .4s ease;
-    }
+    img.post-img { width: 100%; height: auto; border-radius: 12px; margin-top:8px; outline: 1px solid rgba(255,255,255,0.1); transition: transform .4s ease, filter .4s ease; }
     .post:hover img.post-img { transform: scale(1.01); filter: saturate(115%) contrast(105%); }
-
     .actions { margin-top:8px; display:flex; gap:10px; align-items:center; }
-
-    .like-btn { position: relative; }
-    .like-btn.liked { box-shadow: 0 12px 24px rgba(16,185,129,0.35); }
-    .like-pop {
-      position:absolute; left:50%; top:-6px; transform: translate(-50%, -20px) scale(.6);
-      opacity:0; pointer-events:none; font-size:18px;
-      transition: transform .35s cubic-bezier(.18,.89,.32,1.28), opacity .35s ease;
-    }
+    .like-btn { position: relative; } .like-btn.liked { box-shadow: 0 12px 24px rgba(16,185,129,0.35); }
+    .like-pop { position:absolute; left:50%; top:-6px; transform: translate(-50%, -20px) scale(.6); opacity:0; pointer-events:none; font-size:18px; transition: transform .35s cubic-bezier(.18,.89,.32,1.28), opacity .35s ease; }
     .like-btn.liked .like-pop { opacity:1; transform: translate(-50%, -28px) scale(1); }
-
     .comments { margin-top:10px; font-size:14px; }
     .comment { border-top:1px dashed rgba(255,255,255,0.08); padding-top:6px; margin-top:6px; }
-
-    /* Subtle divider glow */
     .divider { height:1px; margin:8px 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent); }
-
-    /* Footer watermark */
     .watermark { text-align:center; color: var(--muted); font-size:12px; margin-top: 22px; }
   </style>
 </head>
@@ -251,54 +82,17 @@
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script>
-  // ---------- Socket setup ----------
-  const socket = io("https://islambook.onrender.com");
+  // ---------- Socket setup (diagnostic + robust + dedupe-aware) ----------
+  const socket = io("https://islambook.onrender.com", { transports: ['websocket','polling'] });
+
   socket.on('connect', () => {
-    console.log('connected to socket', socket.id);
+    console.log('[SOCKET] connected', socket.id);
     socket.emit('request_sync');
   });
 
-  socket.on('sync', async (posts) => {
-    for (const p of posts) { await savePostToDB(p); }
-    await loadAndRenderFeed();
-  });
-
-  socket.on('post', async (post) => {
-    await savePostToDB(post);
-    prependPostToFeed(post);
-  });
-
-  socket.on('like', async (payload) => {
-    const db = await openDB();
-    const tx = db.transaction(STORE,'readwrite');
-    const store = tx.objectStore(STORE);
-    const req = store.get(payload.postId);
-    req.onsuccess = async () => {
-      const post = req.result; if (!post) return;
-      post.likes = post.likes || [];
-      if (payload.action === 'like') {
-        post.likes.push({ id: payload.likeId, userId: payload.userId, created_at: payload.created_at });
-      } else {
-        post.likes = post.likes.filter(l => l.id !== payload.likeId && l.userId !== payload.userId);
-      }
-      await updatePostInDB(post);
-      refreshPostInDOM(post.id, post);
-    };
-  });
-
-  socket.on('comment', async (payload) => {
-    const db = await openDB();
-    const tx = db.transaction(STORE,'readwrite');
-    const store = tx.objectStore(STORE);
-    const req = store.get(payload.postId);
-    req.onsuccess = async () => {
-      const post = req.result; if (!post) return;
-      post.comments = post.comments || [];
-      post.comments.unshift(payload.comment);
-      await updatePostInDB(post);
-      refreshPostInDOM(post.id, post);
-    };
-  });
+  socket.on('disconnect', (reason) => console.log('[SOCKET] disconnect', reason));
+  socket.on('connect_error', (err) => console.error('[SOCKET] connect_error', err));
+  socket.onAny((ev, ...args) => console.log('[SOCKET] incoming', ev, args));
 
   // ---------- IndexedDB helper ----------
   const DB_NAME = 'mini_social_v1';
@@ -332,6 +126,17 @@
     });
   }
 
+  async function existsInDB(postId) {
+    const db = await openDB();
+    return new Promise((res, rej) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const store = tx.objectStore(STORE);
+      const req = store.get(postId);
+      req.onsuccess = () => res(!!req.result);
+      req.onerror = () => rej(req.error);
+    });
+  }
+
   async function getAllPostsFromDB() {
     const db = await openDB();
     return new Promise((res, rej) => {
@@ -348,7 +153,7 @@
   // ---------- Utils ----------
   function uid() { return (crypto && crypto.randomUUID) ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2,9); }
   function timeNow() { return new Date().toISOString(); }
-  function escapeHtml(s) { return (!s ? '' : s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m]))); }
+  function escapeHtml(s) { return (!s ? '' : s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))); }
 
   // ---------- UI rendering ----------
   const feedEl = document.getElementById('feed');
@@ -360,8 +165,7 @@
 
     const meta = document.createElement('div');
     meta.className = 'meta';
-    meta.innerHTML = `<div><b>${escapeHtml(post.userName || 'Anonymous')}</b></div>
-                      <div>${new Date(post.created_at).toLocaleString()}</div>`;
+    meta.innerHTML = `<div><b>${escapeHtml(post.userName || 'Anonymous')}</b></div>\n                      <div>${new Date(post.created_at).toLocaleString()}</div>`;
 
     const caption = document.createElement('div');
     caption.textContent = post.caption || '';
@@ -463,7 +267,75 @@
     entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('show'); });
   }, { threshold: 0.06 });
 
-  // ---------- App logic: upload / like / comment ----------
+  // ---------- Socket event handlers (dedupe-aware) ----------
+  socket.on('sync', async (posts) => {
+    console.log('[SOCKET] sync received,', posts && posts.length, 'posts');
+    for (const p of posts) {
+      try {
+        const exists = await existsInDB(p.id);
+        if (!exists) await savePostToDB(p);
+      } catch (err) {
+        console.error('sync: db err', err);
+      }
+    }
+    await loadAndRenderFeed();
+  });
+
+  socket.on('post', async (post) => {
+    try {
+      const exists = await existsInDB(post.id);
+      if (exists) {
+        console.log('[SOCKET] post skipped (already have)', post.id);
+        return;
+      }
+      await savePostToDB(post);
+      prependPostToFeed(post);
+    } catch (err) { console.error('[SOCKET] post handler err', err); }
+  });
+
+  socket.on('like', async (payload) => {
+    try {
+      const db = await openDB();
+      const tx = db.transaction(STORE,'readwrite');
+      const store = tx.objectStore(STORE);
+      const req = store.get(payload.postId);
+      req.onsuccess = async () => {
+        const post = req.result; if (!post) return;
+        post.likes = post.likes || [];
+        if (payload.action === 'like') {
+          const exists = post.likes.find(l => l.id === payload.likeId || l.userId === payload.userId);
+          if (!exists) post.likes.push({ id: payload.likeId, userId: payload.userId, created_at: payload.created_at });
+        } else {
+          post.likes = post.likes.filter(l => l.id !== payload.likeId && l.userId !== payload.userId);
+        }
+        await updatePostInDB(post);
+        refreshPostInDOM(post.id, post);
+      };
+      req.onerror = (e) => console.error('like: db get err', e);
+    } catch (err) { console.error('[SOCKET] like handler err', err); }
+  });
+
+  socket.on('comment', async (payload) => {
+    try {
+      const db = await openDB();
+      const tx = db.transaction(STORE,'readwrite');
+      const store = tx.objectStore(STORE);
+      const req = store.get(payload.postId);
+      req.onsuccess = async () => {
+        const post = req.result; if (!post) return;
+        post.comments = post.comments || [];
+        const exists = post.comments.find(c => c.id === payload.comment.id);
+        if (!exists) {
+          post.comments.unshift(payload.comment);
+          await updatePostInDB(post);
+          refreshPostInDOM(post.id, post);
+        }
+      };
+      req.onerror = (e) => console.error('comment: db get err', e);
+    } catch (err) { console.error('[SOCKET] comment handler err', err); }
+  });
+
+  // ---------- App logic: upload / like / comment (client-side remains almost same) ----------
   document.getElementById('uploadForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const fileInput = document.getElementById('imageInput');
@@ -485,8 +357,12 @@
       imageData: dataUrl, created_at: timeNow(), likes: [], comments: []
     };
 
+    // local save + render
     await savePostToDB(post);
     prependPostToFeed(post);
+
+    // emit to server (server currently emits to all clients including sender)
+    console.log('[EMIT] new_post', post.id);
     socket.emit('new_post', post);
 
     fileInput.value = '';
@@ -518,8 +394,10 @@
       }
       countEl.textContent = post.likes.length;
       await updatePostInDB(post);
+      console.log('[EMIT] like', payload);
       socket.emit('like', payload);
     };
+    req.onerror = (e) => console.error('toggleLike: db get err', e);
   }
 
   async function postComment(postId, text) {
@@ -537,17 +415,16 @@
       post.comments.unshift(comment);
       await updatePostInDB(post);
       refreshPostInDOM(postId, post);
+      console.log('[EMIT] comment', payload);
       socket.emit('comment', payload);
     };
+    req.onerror = (e) => console.error('postComment: db get err', e);
   }
 
   // Tiny celebration burst on successful upload
   function microCelebrate() {
     const el = document.createElement('div');
-    Object.assign(el.style, {
-      position: 'fixed', left: '50%', top: '72px', transform: 'translateX(-50%)',
-      fontSize: '18px', pointerEvents: 'none', zIndex: 9999, opacity: 0, transition: 'all .8s ease'
-    });
+    Object.assign(el.style, { position: 'fixed', left: '50%', top: '72px', transform: 'translateX(-50%)', fontSize: '18px', pointerEvents: 'none', zIndex: 9999, opacity: 0, transition: 'all .8s ease' });
     el.textContent = ['✨','🎉','💫','🌈','⚡','🎆'][Math.floor(Math.random()*6)];
     document.body.appendChild(el);
     requestAnimationFrame(() => { el.style.opacity = 1; el.style.top = '42px'; });
