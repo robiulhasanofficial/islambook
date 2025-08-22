@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="theme-color" content="#0ea5e9" />
-  <title>Mini Image Share — Responsive · Polished Viewer (Comments Enabled)</title>
+  <title>Mini Image Share — Responsive · Polished Viewer (Comments + Global Chat)</title>
   <style>
     :root{
       --c1:#7c3aed; --c2:#0ea5e9; --bg:#0b1020; --card:#071028; --text:#e5e7eb; --muted:#9aa4bf;
@@ -69,6 +69,32 @@
     .lb-caption{position:absolute;left:18px;bottom:18px;color:var(--muted);font-size:13px;max-width:70vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .lb-hint{position:absolute;left:50%;transform:translateX(-50%);top:18px;color:var(--muted);font-size:13px}
 
+    /* Chat / message floating UI (bottom-right) */
+    .chat-button{
+      position:fixed; right:18px; bottom:18px; z-index:10010; width:56px; height:56px; border-radius:999px;
+      display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow: 0 8px 24px rgba(2,6,23,0.6);
+      background:linear-gradient(180deg,var(--c2),var(--c1)); color:#fff; border: none; font-size:20px;
+      transition:transform .12s ease;
+    }
+    .chat-button:hover{ transform:translateY(-4px) }
+    .chat-unread{
+      position:absolute; top:6px; right:6px; min-width:18px; height:18px; border-radius:999px; padding:0 6px;
+      background:#ff4d6d; color:#fff; font-weight:700; font-size:11px; display:flex; align-items:center; justify-content:center;
+    }
+
+    .chat-panel{
+      position:fixed; right:18px; bottom:86px; width:320px; max-width:92vw; height:420px; z-index:10005;
+      background:linear-gradient(180deg, rgba(8,12,20,0.95), rgba(4,6,10,0.95)); border:1px solid rgba(255,255,255,0.04);
+      border-radius:12px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 40px rgba(2,6,23,0.7);
+    }
+    .chat-header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.02); font-weight:700; color:var(--muted)}
+    .chat-messages{flex:1;padding:10px; overflow:auto; display:flex; flex-direction:column; gap:8px; }
+    .chat-msg{background:rgba(255,255,255,0.02);padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.02); font-size:13px; color:var(--muted);}
+    .chat-msg strong{color:var(--text); display:block; font-size:12px;}
+    .chat-input{display:flex; gap:8px; padding:10px; border-top:1px solid rgba(255,255,255,0.01);}
+    .chat-input input{flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.01);color:var(--text)}
+    .chat-input button{padding:8px 12px;border-radius:8px;border:0;background:var(--accent);color:#05070f;font-weight:700;cursor:pointer}
+
     /* responsive tweaks */
     @media (max-width:900px){
       .wrap{padding:12px}
@@ -77,6 +103,7 @@
       .lightbox-inner{padding:12px}
       .lb-controls{right:12px;top:12px;flex-direction:row}
       .lb-btn{padding:8px}
+      .chat-panel{width:92vw; right:4vw; left:4vw; bottom:86px}
     }
     @media (max-width:480px){
       header.app{gap:8px}
@@ -84,15 +111,11 @@
       #feed{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
       .img-frame{padding:6px}
       .lb-caption{display:none}
+      .chat-panel{height:56vh}
     }
 
     /* focus outlines for accessibility */
     button:focus, .post:focus-within{outline:2px solid rgba(124,58,237,0.25);outline-offset:3px}
-
-    /* subtle scrollbar style for desktop lightbox scroll (if used) */
-    .lightbox-inner::-webkit-scrollbar{width:8px;height:8px}
-    .lightbox-inner::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.06);border-radius:6px}
-
   </style>
 </head>
 <body>
@@ -142,6 +165,25 @@
     </div>
   </div>
 
+  <!-- Chat UI: floating button + panel -->
+  <button id="chatToggleBtn" class="chat-button" aria-label="Open global messages">💬
+    <span id="chatUnread" class="chat-unread" style="display:none">0</span>
+  </button>
+
+  <div id="chatPanel" class="chat-panel" style="display:none" role="dialog" aria-label="Global messages">
+    <div class="chat-header">
+      <div>Everyone's Messages</div>
+      <div>
+        <button id="chatCloseBtn" title="Close" style="border:0;background:transparent;color:var(--muted);cursor:pointer">✕</button>
+      </div>
+    </div>
+    <div id="chatMessages" class="chat-messages" aria-live="polite"></div>
+    <div class="chat-input">
+      <input id="chatInput" placeholder="Message everyone..." aria-label="Type a message" />
+      <button id="chatSendBtn">Send</button>
+    </div>
+  </div>
+
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script>
   // ---------- preserved app logic (improved/responsive tweaks) ----------
@@ -153,11 +195,11 @@
   document.getElementById('idBadge').addEventListener('click', ()=>{ navigator.clipboard?.writeText(currentUserId).then(()=>{ const b = document.getElementById('idBadge'); const prev = b.textContent; b.textContent='Copied!'; setTimeout(()=> b.textContent = `You: ${currentUserId}`,900); }).catch(()=>alert('Copy failed — your ID: '+currentUserId)); });
 
   const socket = io("https://islambook.onrender.com", { transports: ['websocket','polling'] });
-  socket.on('connect', () => { console.log('[SOCKET] connected', socket.id); socket.emit('request_sync'); });
+  socket.on('connect', () => { console.log('[SOCKET] connected', socket.id); socket.emit('request_sync'); socket.emit('request_messages'); });
 
-  // IndexedDB helpers (updated to gracefully handle VersionError)
-  const DB_NAME = 'mini_social_v1'; const STORE = 'posts'; let dbPromise = null;
-  const DEFAULT_DB_VERSION = 1; // bump this if you intentionally change schema
+  // IndexedDB helpers (updated to gracefully handle VersionError & add messages store)
+  const DB_NAME = 'mini_social_v1'; const STORE = 'posts'; const MSTORE = 'messages'; let dbPromise = null;
+  const DEFAULT_DB_VERSION = 2; // bumped to add messages store
 
   function openDB(){
     if(dbPromise) return dbPromise;
@@ -169,6 +211,11 @@
           const store = db.createObjectStore(STORE, { keyPath: 'id' });
           store.createIndex('created_at', 'created_at');
           store.createIndex('userId', 'userId');
+        }
+        if (!db.objectStoreNames.contains(MSTORE)) {
+          const m = db.createObjectStore(MSTORE, { keyPath: 'id' });
+          m.createIndex('created_at', 'created_at');
+          m.createIndex('userId', 'userId');
         }
       };
 
@@ -214,6 +261,11 @@
   async function existsInDB(postId){ const db = await openDB(); return new Promise((res, rej) => { const tx = db.transaction(STORE,'readonly'); const req = tx.objectStore(STORE).get(postId); req.onsuccess = ()=> res(!!req.result); req.onerror = ()=> rej(req.error); }); }
   async function getAllPostsFromDB(){ const db = await openDB(); return new Promise((res, rej) => { const tx = db.transaction(STORE,'readonly'); const req = tx.objectStore(STORE).getAll(); req.onsuccess = ()=> res(req.result.sort((a,b)=> new Date(b.created_at) - new Date(a.created_at))); req.onerror = ()=> rej(req.error); }); }
   async function updatePostInDB(post){ return savePostToDB(post); }
+
+  // messages helpers
+  async function saveMessageToDB(msg){ const db = await openDB(); return new Promise((res, rej) => { const tx = db.transaction(MSTORE, 'readwrite'); tx.objectStore(MSTORE).put(msg); tx.oncomplete = ()=> res(); tx.onerror = ()=> rej(tx.error); }); }
+  async function existsMessageInDB(id){ const db = await openDB(); return new Promise((res, rej) => { const tx = db.transaction(MSTORE,'readonly'); const req = tx.objectStore(MSTORE).get(id); req.onsuccess = ()=> res(!!req.result); req.onerror = ()=> rej(req.error); }); }
+  async function getAllMessagesFromDB(){ const db = await openDB(); return new Promise((res, rej) => { const tx = db.transaction(MSTORE,'readonly'); const req = tx.objectStore(MSTORE).getAll(); req.onsuccess = ()=> res(req.result.sort((a,b)=> new Date(a.created_at) - new Date(b.created_at))); req.onerror = ()=> rej(req.error); }); }
 
   function uid(){ return (crypto && crypto.randomUUID) ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2,9); }
   function timeNow(){ return new Date().toISOString(); }
@@ -353,6 +405,22 @@
   socket.on('like', async (payload)=>{ try{ const db = await openDB(); const tx = db.transaction(STORE,'readwrite'); const store = tx.objectStore(STORE); const req = store.get(payload.postId); req.onsuccess = async ()=>{ const post = req.result; if(!post) return; post.likes = post.likes||[]; if(payload.action==='like'){ if(!post.likes.find(l=>l.id===payload.likeId||l.userId===payload.userId)) post.likes.push({id:payload.likeId,userId:payload.userId,userName:payload.userName||null,created_at:payload.created_at}); } else { post.likes = post.likes.filter(l=>l.id!==payload.likeId&&l.userId!==payload.userId); } await updatePostInDB(post); refreshPostInDOM(post.id,post); }; }catch(e){console.error(e);} });
   socket.on('comment', async (payload)=>{ try{ const db = await openDB(); const tx = db.transaction(STORE,'readwrite'); const store = tx.objectStore(STORE); const req = store.get(payload.postId); req.onsuccess = async ()=>{ const post = req.result; if(!post) return; post.comments = post.comments||[]; if(!post.comments.find(c=>c.id===payload.comment.id)){ post.comments.unshift(payload.comment); await updatePostInDB(post); refreshPostInDOM(post.id,post); } }; }catch(e){console.error(e);} });
 
+  // messages socket handlers
+  socket.on('messages_sync', async (messages)=>{ // optional server support
+    for(const m of messages||[]){ try{ if(!(await existsMessageInDB(m.id))) await saveMessageToDB(m); }catch(e){} }
+    // if panel open, reload messages
+    if(chatPanelOpen) loadAndRenderMessages();
+  });
+
+  socket.on('message', async (msg)=>{ // single new message from server
+    try{
+      if(!(await existsMessageInDB(msg.id))){
+        await saveMessageToDB(msg);
+        if(chatPanelOpen) appendMessageToUI(msg); else incrementUnreadBadge();
+      }
+    }catch(e){ console.error(e); }
+  });
+
   // ---------- Upload handler (uses processImageFile) ----------
   document.getElementById('uploadBtn').addEventListener('click', async (e)=>{
     e.preventDefault(); const fileInput = document.getElementById('imageInput'); const caption = document.getElementById('caption').value.trim(); const file = fileInput.files && fileInput.files[0]; if(!file) return alert('Choose an image first'); if(file.size > 20*1024*1024 && !confirm('Image is large (>20MB). Continue?')) return;
@@ -403,8 +471,93 @@
   searchBtn.addEventListener('click', async ()=>{ await loadAndRenderFeed(searchInput.value.trim()); });
   searchInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); loadAndRenderFeed(searchInput.value.trim()); } });
 
+  // ---------- Global chat logic ----------
+  const chatToggleBtn = document.getElementById('chatToggleBtn');
+  const chatPanel = document.getElementById('chatPanel');
+  const chatCloseBtn = document.getElementById('chatCloseBtn');
+  const chatMessagesEl = document.getElementById('chatMessages');
+  const chatInput = document.getElementById('chatInput');
+  const chatSendBtn = document.getElementById('chatSendBtn');
+  const chatUnread = document.getElementById('chatUnread');
+
+  let chatPanelOpen = false;
+  let unreadCount = 0;
+
+  function showUnreadBadge(){ if(unreadCount>0){ chatUnread.style.display='flex'; chatUnread.textContent = unreadCount>99? '99+' : String(unreadCount); } else chatUnread.style.display='none'; }
+  function incrementUnreadBadge(){ unreadCount++; showUnreadBadge(); }
+
+  chatToggleBtn.addEventListener('click', async ()=>{
+    chatPanelOpen = !chatPanelOpen;
+    chatPanel.style.display = chatPanelOpen ? 'flex' : 'none';
+    if(chatPanelOpen){
+      unreadCount = 0; showUnreadBadge();
+      await loadAndRenderMessages();
+      chatInput.focus();
+    }
+  });
+  chatCloseBtn.addEventListener('click', ()=>{ chatPanelOpen = false; chatPanel.style.display='none'; });
+
+  chatSendBtn.addEventListener('click', ()=>{ const txt = chatInput.value.trim(); if(!txt) return; sendMessage(txt); chatInput.value=''; });
+  chatInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); chatSendBtn.click(); } });
+
+  async function sendMessage(text){
+    const msg = { id: uid(), userId: currentUserId, userName: currentUser, text, created_at: timeNow() };
+    try{
+      await saveMessageToDB(msg);
+      appendMessageToUI(msg);
+      // optimistic: emit to server so others receive
+      socket.emit('message', msg);
+    }catch(e){ console.error('message save failed', e); alert('Message failed to send locally.'); }
+  }
+
+  function appendMessageToUI(msg){
+    const div = document.createElement('div');
+    div.className = 'chat-msg';
+    const when = new Date(msg.created_at).toLocaleTimeString();
+    div.innerHTML = `<strong>${escapeHtml(msg.userName||'Anon')}</strong><div>${escapeHtml(msg.text)}</div><div style="font-size:11px;color:var(--muted);margin-top:6px">${when}</div>`;
+    chatMessagesEl.appendChild(div);
+    // keep scroll at bottom
+    chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+  }
+
+  async function loadAndRenderMessages(){
+    chatMessagesEl.innerHTML = '';
+    try{
+      const msgs = await getAllMessagesFromDB();
+      msgs.forEach(m=>{ appendMessageToUI(m); });
+      // keep scroll bottom
+      chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+    }catch(e){ console.error('load messages failed', e); chatMessagesEl.innerHTML = "<div style='opacity:0.75'>Unable to load messages</div>"; }
+  }
+
+  // called when we receive a message and panel is closed
+  function handleIncomingMessage(msg){
+    if(chatPanelOpen){
+      appendMessageToUI(msg);
+    } else {
+      incrementUnreadBadge();
+    }
+  }
+
+  // helper for server-driven sync
+  async function loadAndRenderMessagesIfOpen(){
+    if(chatPanelOpen) await loadAndRenderMessages();
+  }
+
+  // ---------- Socket: request messages on connect (already emitted above) ----------
+  // 'message' event handled earlier: it saves and appends/increments unread.
+  // For safety, also handle local saves to show messages immediately when user sends.
+
   // ---------- Initial load ----------
-  (async ()=>{ await openDB(); await loadAndRenderFeed(); })();
+  (async ()=>{ await openDB(); await loadAndRenderFeed(); // preload messages count for badge
+    try{
+      const msgs = await getAllMessagesFromDB();
+      // set unread to zero initially (you could compute unread by timestamp if you want)
+      unreadCount = 0;
+      showUnreadBadge();
+    }catch(e){ console.warn('messages preload failed', e); }
+  })();
+
   </script>
 </body>
 </html>
