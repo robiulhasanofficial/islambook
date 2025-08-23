@@ -1,8 +1,22 @@
 :root{
-  --c1:#7c3aed; --c2:#0ea5e9; --bg:#0b1020; --card:#071028; --text:#e5e7eb; --muted:#9aa4bf;
-  --glass: rgba(255,255,255,0.03); --radius:14px; --gap:14px; --accent:linear-gradient(90deg,var(--c1),var(--c2));
-  /* estimated header height used to reserve space for sticky header */
-  --header-h: 72px;
+  --c1:#7c3aed;
+  --c2:#0ea5e9;
+  --c3:#ff4d6d;
+  --c4:#f59e0b;
+  --bg:#0b1020;
+  --card:#071028;
+  --text:#e5e7eb;
+  --muted:#9aa4bf;
+  --glass: rgba(255,255,255,0.03);
+  --radius:14px;
+  --gap:14px;
+  --accent:linear-gradient(90deg,var(--c1),var(--c2));
+  --header-h:72px;
+
+  /* Active users widget sizing */
+  --au-size:56px;
+  --au-pill-padding:10px 14px;
+  --au-panel-width:340px;
 }
 
 /* box sizing */
@@ -17,40 +31,34 @@ html,body{
   color:var(--text);
   background:linear-gradient(135deg,#071026 0%,#03040a 100%);
   -webkit-font-smoothing:antialiased;
-  overflow-x: hidden;       /* disable horizontal page scroll */
+  overflow-x: hidden;
   -webkit-text-size-adjust:100%;
-  touch-action: pan-y;      /* prefer vertical scrolling on touch */
+  touch-action: pan-y;
   overscroll-behavior-x: none;
 }
 
-/* App container
-   Reserve top padding so feed/content doesn't get hidden under the sticky header.
-   We add the header height + the original top margin (18px) so visual spacing is preserved.
-*/
+/* App container */
 .wrap{
   max-width:1200px;
   margin:18px auto;
   padding:18px;
-  padding-top: calc(18px + var(--header-h)); /* ensure content starts below sticky header */
+  padding-top: calc(18px + var(--header-h));
 }
 
-/* Sticky header — make sure it sits above everything (big z-index),
-   and give it a slightly more solid background so content beneath doesn't show through.
-*/
+/* Sticky header */
 header.app{
   display:flex;
-  flex-wrap:wrap;           /* allow wrapping so items can move to new rows */
+  flex-wrap:wrap;
   align-items:center;
   gap:12px;
   position:sticky;
-  top:0;                    /* stick to very top of viewport */
-  z-index:10050;            /* very high so images / overlays don't cover it */
+  top:0;
+  z-index:10050;
   padding:12px;
-  border-radius:0 0 12px 12px; /* rounded bottom only */
-  background:linear-gradient(180deg, rgba(6,10,20,0.92), rgba(6,10,20,0.88)); /* more opaque */
+  border-radius:0 0 12px 12px;
+  background:linear-gradient(180deg, rgba(6,10,20,0.92), rgba(6,10,20,0.88));
   border:1px solid rgba(255,255,255,0.04);
   backdrop-filter:blur(8px);
-  /* expose approximate height for CSS spacing above */
   min-height: var(--header-h);
 }
 
@@ -73,7 +81,7 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
 
 /* Feed grid */
 #feed{margin-top:18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:var(--gap)}
-.post{position:relative; z-index:1; /* keep posts below header */ 
+.post{position:relative; z-index:1;
   background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));
   border:1px solid rgba(255,255,255,0.03);
   border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;transition:transform 180ms ease, box-shadow 180ms ease}
@@ -100,10 +108,7 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
 /* comment count visual */
 .lb-small-btn .comment-count{ margin-left:6px; font-weight:700; color:var(--text); }
 
-/* Lightbox / viewer
-   Make sure its z-index is below header so header stays on top.
-   (If you actually want lightbox to cover header, increase its z-index > header)
-*/
+/* Lightbox / viewer */
 .lightbox-overlay{position:fixed;inset:0;z-index:10030;display:none;align-items:center;justify-content:center;background:linear-gradient(180deg, rgba(2,6,23,0.9), rgba(2,6,23,0.95))}
 .lightbox-overlay.open{display:flex}
 .lightbox-inner{position:relative;max-width:96vw;max-height:96vh;border-radius:12px;display:flex;align-items:center;justify-content:center;background:rgba(8,12,20,0.6);backdrop-filter:blur(8px);padding:18px}
@@ -142,7 +147,202 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
 .chat-input input{flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.01);color:var(--text)}
 .chat-input button{padding:8px 12px;border-radius:8px;border:0;background:var(--accent);color:#05070f;font-weight:700;cursor:pointer}
 
-/* responsive tweaks (unchanged default behavior for mid/large screens) */
+/* =========================
+   ACTIVE USERS WIDGET (Updated)
+   Positioned on the RIGHT, colorful badge, responsive behavior
+   ========================= */
+
+#active-users-widget{
+  position:fixed;
+  top:18px;
+  right:18px; /* moved to right side */
+  z-index:10070;
+  display:flex;
+  align-items:flex-end;
+  gap:8px;
+  font-family:inherit;
+  pointer-events:auto;
+}
+
+/* Toggle pill */
+#active-users-toggle.au-toggle{
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  padding:var(--au-pill-padding);
+  min-height:var(--au-size);
+  border-radius:999px;
+  background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border:1px solid rgba(255,255,255,0.04);
+  color:var(--text);
+  cursor:pointer;
+  box-shadow:0 6px 22px rgba(2,6,23,0.6);
+  transition:transform .12s ease, box-shadow .12s ease;
+  backdrop-filter: blur(6px);
+  user-select:none;
+}
+
+/* Small dot indicator */
+.au-dot{
+  width:12px;height:12px;border-radius:999px;display:inline-block;
+  box-shadow:0 0 0 4px rgba(0,0,0,0.12) inset;
+  background: radial-gradient(circle at 30% 30%, #fff 8%, transparent 9%), linear-gradient(90deg,var(--c1),var(--c2));
+  transform:translateY(0);
+  transition:transform .18s ease;
+}
+
+/* Colorful animated count badge */
+.au-count{
+  display:inline-flex;
+  min-width:34px;
+  padding:6px 10px;
+  border-radius:999px;
+  font-weight:800;
+  font-variant-numeric:tabular-nums;
+  align-items:center;
+  justify-content:center;
+  color:#fff;
+  background:linear-gradient(90deg,var(--c1),var(--c2),var(--c3),var(--c4));
+  background-size:200% 200%;
+  animation:au-gradient-shift 4s linear infinite;
+  box-shadow:0 6px 18px rgba(124,58,237,0.12);
+  border:1px solid rgba(255,255,255,0.06);
+  font-size:13px;
+}
+
+/* Optional label text */
+.au-label{
+  font-weight:700;
+  font-size:13px;
+  color:var(--muted);
+  white-space:nowrap;
+}
+
+/* panel (the list) - appears under the pill, aligned to the right */
+#active-users-list.au-list{
+  position:absolute;
+  top:calc(100% + 12px);
+  right:0;
+  width:var(--au-panel-width);
+  max-width: min(92vw, var(--au-panel-width));
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border:1px solid rgba(255,255,255,0.04);
+  border-radius:12px;
+  padding:10px;
+  box-shadow:0 18px 50px rgba(2,6,23,0.6);
+  transform-origin: top right;
+  transition:opacity .18s ease, transform .18s ease;
+  color:var(--text);
+}
+
+/* Hidden panel fallback (JS toggles [hidden] attr) */
+#active-users-list[hidden]{
+  opacity:0; transform:translateY(-6px) scale(.995); pointer-events:none; height:auto;
+  display:block; /* keep in DOM so show/hide animation can run if using JS class toggle */
+}
+
+/* When visible (remove hidden in JS) ensure opaque */
+#active-users-list:not([hidden]){
+  opacity:1; transform:translateY(0) scale(1);
+  pointer-events:auto;
+}
+
+/* header inside the panel */
+.au-list-header{display:flex;align-items:center;justify-content:space-between;padding:6px 4px;border-bottom:1px solid rgba(255,255,255,0.02);margin-bottom:8px}
+.au-list-header strong{font-size:14px;color:var(--text)}
+
+/* close button */
+.au-close{background:transparent;border:0;color:var(--muted);font-size:20px;cursor:pointer;padding:4px;border-radius:8px}
+.au-close:hover{color:var(--text);background:rgba(255,255,255,0.02)}
+
+/* list items */
+.au-ul{list-style:none;margin:0;padding:0;max-height:280px;overflow:auto;display:flex;flex-direction:column;gap:6px}
+.au-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:8px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);border:1px solid rgba(255,255,255,0.02)}
+.au-item:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(2,6,23,0.45)}
+.au-item-name{font-weight:700;color:var(--text)}
+.au-item-id{font-size:12px;color:var(--muted)}
+
+/* empty state */
+.au-empty{color:var(--muted);padding:8px;text-align:center}
+
+/* footer */
+.au-list-footer{display:flex;gap:8px;justify-content:flex-end;padding-top:8px;border-top:1px solid rgba(255,255,255,0.02);margin-top:8px}
+.au-action{padding:8px 10px;border-radius:8px;border:0;background:rgba(255,255,255,0.02);color:var(--muted);cursor:pointer}
+.au-action:hover{background:rgba(255,255,255,0.03);color:var(--text)}
+
+/* noscript */
+.au-noscript{padding:8px;color:var(--muted);font-size:13px}
+
+/* ensure the list doesn't go under header if near top */
+@media (min-width:1000px){
+  /* keep it slightly lower on very wide screens */
+  #active-users-widget{ top:22px; right:22px; }
+}
+
+/* Mobile responsiveness: move widget to bottom-right as compact floating button */
+@media (max-width:768px){
+  #active-users-widget{
+    top:auto;
+    right:16px;
+    bottom:16px; /* bottom-right on mobile to avoid covering header */
+    align-items:flex-end;
+    gap:0;
+  }
+
+  #active-users-toggle.au-toggle{
+    padding:8px;
+    min-height:48px;
+    box-shadow:0 14px 34px rgba(2,6,23,0.7);
+  }
+
+  /* hide the text label on smaller screens to reduce width */
+  .au-label{ display:none; }
+
+  /* smaller dot and count */
+  .au-dot{ width:10px; height:10px; }
+  .au-count{ min-width:30px; padding:6px 8px; font-size:12px; }
+
+  /* Make the panel behave like a bottom sheet */
+  #active-users-list.au-list{
+    left:50%;
+    right:auto;
+    transform:translateX(-50%) translateY(10px);
+    top:auto;
+    bottom:calc(100% + 12px);
+    width: min(96vw, 420px);
+    max-height:55vh;
+    border-radius:12px;
+  }
+
+  /* When panel is open on mobile, show full width modal like behavior if needed */
+  #active-users-list[open],
+  #active-users-list:not([hidden]){ /* JS may toggle hidden attr; this ensures visibility */
+    transform:translateX(-50%) translateY(0);
+  }
+}
+
+/* Very small screens: make it more compact and accessible */
+@media (max-width:420px){
+  #active-users-toggle.au-toggle{ width:auto; padding:8px; }
+  .au-count{ font-size:12px; min-width:28px; padding:6px 6px; }
+}
+
+/* focus & accessibility */
+#active-users-toggle:focus, .au-action:focus, .au-close:focus, .au-item:focus{ outline:2px solid rgba(124,58,237,0.24); outline-offset:3px; }
+
+/* gradient shifting keyframe */
+@keyframes au-gradient-shift{
+  0%{ background-position:0% 50% }
+  50%{ background-position:100% 50% }
+  100%{ background-position:0% 50% }
+}
+
+/* reduced motion preference */
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important; }
+}
+
+/* responsive tweaks (existing) */
 @media (max-width:900px){
   .wrap{padding:12px}
   header.app{padding:10px}
@@ -153,33 +353,16 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
   .chat-panel{width:92vw; right:4vw; left:4vw; bottom:86px}
 }
 
-/* ========== MOBILE: move header-right below search & force single column ========== */
-/* On small screens we want:
-   - feed: single column
-   - header: keep logo/title on top row, make .search-wrap full-width next row,
-     and move .header-right to its own full-width row below the search.
-*/
+/* ========== MOBILE: keep header responsive ========== */
 @media (max-width:768px){
-  /* feed single column */
   #feed{ grid-template-columns: 1fr !important; gap:12px }
-
-  /* header layout: allow wrapping and full-width rows for search & right area */
   header.app{
     align-items:center;
     gap:10px;
-    /* smaller header on mobile: reduce reserved header height */
     min-height: 72px;
   }
-
-  /* control ordering so elements appear as:
-     (logo) (title)  -> first row (they wrap naturally if space)
-     .search-wrap    -> full width next row
-     .header-right   -> full width bottom row
-  */
   .logo{ order: 0; flex: 0 0 auto; }
   h1.title{ order: 1; flex: 1 1 auto; min-width: 0; }
-
-  /* make search full width and appear before header-right */
   .search-wrap{
     order: 2;
     flex: 1 1 100%;
@@ -190,27 +373,21 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
     margin-top:6px;
   }
   .search-wrap input{ min-width: 0; width: 100%; }
-
-  /* header-right moves to its own row under the search */
   .header-right{
     order: 3;
-    margin-left: 0;          /* remove auto margin so it sits full-width */
+    margin-left: 0;
     flex: 1 1 100%;
     width: 100%;
     display:flex;
     flex-wrap:wrap;
     gap:8px;
-    justify-content: flex-start; /* align items to left, change as desired */
+    justify-content: flex-start;
     margin-top:8px;
   }
-
-  /* make badges and buttons touch-friendly on mobile */
   .id-badge, .lb-small-btn, .primary, .search-wrap button {
     min-height:44px;
     padding-inline:12px;
   }
-
-  /* light adjustments */
   header.app{ padding-left:12px; padding-right:12px; }
 }
 
