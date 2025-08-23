@@ -17,6 +17,14 @@
   --au-size:56px;
   --au-pill-padding:10px 14px;
   --au-panel-width:340px;
+
+  /* control & zoom */
+  --control-bg: linear-gradient(90deg,var(--c3),var(--c1));
+  --control-color: #ffffff;
+  --control-size:48px;
+
+  /* id badge mobile */
+  --id-max-width-mobile:220px;
 }
 
 /* box sizing */
@@ -60,6 +68,9 @@ header.app{
   border:1px solid rgba(255,255,255,0.04);
   backdrop-filter:blur(8px);
   min-height: var(--header-h);
+  /* ensure positioned parent for absolute children like .id-badge on mobile */
+  -webkit-transform:translateZ(0);
+  transform:translateZ(0);
 }
 
 /* brand */
@@ -71,7 +82,26 @@ h1.title{margin:0;font-size:18px;background:var(--accent);-webkit-background-cli
 .search-wrap{display:flex;gap:8px;align-items:center}
 .search-wrap input{padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.02);color:var(--text);min-width:220px}
 .search-wrap button{padding:8px 12px;border-radius:10px;border:0;background:var(--accent);color:#05070f;font-weight:600;cursor:pointer}
-.id-badge{padding:8px 10px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border:1px solid rgba(255,255,255,0.03);font-size:13px;color:var(--muted);cursor:pointer}
+
+/* ID badge - improved for visibility & responsive */
+.id-badge{
+  padding:8px 10px;
+  border-radius:10px;
+  background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);
+  border:1px solid rgba(255,255,255,0.03);
+  font-size:13px;
+  color:var(--muted);
+  cursor:pointer;
+
+  /* display tweaks for showing both name & id inline */
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  max-width:240px; /* default desktop width */
+}
 
 /* Upload card */
 .card.upload{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px;margin-top:16px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.03)}
@@ -117,7 +147,31 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
 
 /* keep all lightbox controls under header by default */
 .lb-controls{position:absolute;right:18px;top:18px;display:flex;flex-direction:column;gap:8px}
-.lb-btn{background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.04);padding:10px;border-radius:10px;color:var(--text);cursor:pointer}
+.lb-btn{
+  /* Updated button styles for better visibility across devices */
+  background: var(--control-bg);
+  color: var(--control-color);
+  border:1px solid rgba(255,255,255,0.06);
+  padding:0;
+  min-width:var(--control-size);
+  min-height:var(--control-size);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:10px;
+  cursor:pointer;
+  font-weight:700;
+  font-size:16px;
+  box-shadow:0 12px 30px rgba(2,6,23,0.6);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 140ms cubic-bezier(.2,.9,.2,1), box-shadow 140ms ease;
+  backdrop-filter: blur(4px);
+}
+.lb-btn:hover{ transform: translateY(-4px); box-shadow:0 18px 40px rgba(2,6,23,0.7); }
+.lb-btn:active{ transform: translateY(-1px); }
+.lb-btn svg{ width:20px; height:20px; display:block; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.55)); }
+
+/* caption and hints */
 .lb-caption{position:absolute;left:18px;bottom:18px;color:var(--muted);font-size:13px;max-width:70vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lb-hint{position:absolute;left:50%;transform:translateX(-50%);top:18px;color:var(--muted);font-size:13px}
 
@@ -180,6 +234,7 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
   transition:transform .12s ease, box-shadow .12s ease;
   backdrop-filter: blur(6px);
   user-select:none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* Small dot indicator */
@@ -208,6 +263,10 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
   box-shadow:0 6px 18px rgba(124,58,237,0.12);
   border:1px solid rgba(255,255,255,0.06);
   font-size:13px;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.35);
+  /* responsive font scaling for perfect mobile fit */
+  font-size: clamp(12px, 1.6vw, 14px);
+  padding: clamp(6px, 1.2vw, 8px) clamp(8px, 1.6vw, 12px);
 }
 
 /* Optional label text */
@@ -319,6 +378,10 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
   #active-users-list:not([hidden]){ /* JS may toggle hidden attr; this ensures visibility */
     transform:translateX(-50%) translateY(0);
   }
+
+  /* increase tappable size for the count and control on mobile */
+  .au-count{ padding:10px 12px; min-width:36px; font-size:14px; }
+  #active-users-toggle.au-toggle{ padding:10px 12px; }
 }
 
 /* Very small screens: make it more compact and accessible */
@@ -330,7 +393,6 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
 /* focus & accessibility */
 #active-users-toggle:focus, .au-action:focus, .au-close:focus, .au-item:focus{ outline:2px solid rgba(124,58,237,0.24); outline-offset:3px; }
 
-/* gradient shifting keyframe */
 @keyframes au-gradient-shift{
   0%{ background-position:0% 50% }
   50%{ background-position:100% 50% }
@@ -389,6 +451,20 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
     padding-inline:12px;
   }
   header.app{ padding-left:12px; padding-right:12px; }
+
+  /* Move .id-badge to top-right absolute so both name and id remain visible on small screens */
+  .id-badge{
+    position: absolute;
+    right: 12px;
+    top: 12px;
+    z-index:10100;
+    max-width: var(--id-max-width-mobile);
+    padding:8px 12px;
+  }
+  .id-badge{ font-size:13px; color:var(--text); background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border:1px solid rgba(255,255,255,0.04); border-radius:8px; }
+
+  /* ensure text inside id-badge truncates properly */
+  .id-badge *{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 }
 
 /* very small screens */
@@ -403,3 +479,27 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
 
 /* accessibility */
 button:focus, .post:focus-within{outline:2px solid rgba(124,58,237,0.25);outline-offset:3px}
+
+/* Extra: make lightbox controls reposition nicely on smaller screens and increase tappable area */
+@media (max-width:900px){
+  .lb-controls{
+    right:12px;
+    top:auto;
+    bottom:12px;
+    left:12px;
+    justify-content:center;
+    flex-direction:row;
+    gap:10px;
+  }
+  .lb-btn{ min-width:44px; min-height:44px; border-radius:10px; }
+}
+
+/* forced-colors / high-contrast fallback */
+@media (forced-colors: active){
+  .lb-btn{ border:2px solid WindowText; background:Window; color:WindowText; }
+  .au-count{ border:2px solid WindowText; background:Window; color:WindowText; }
+}
+
+/* if javascript toggles .zoomed on the image, change cursor & hint */
+.lightbox-overlay.zoomed #lbImg{ cursor:zoom-out; }
+.lightbox-overlay:not(.zoomed) #lbImg{ cursor:zoom-in; }
