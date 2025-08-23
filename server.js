@@ -1,4 +1,4 @@
-// server.js (persistent + image save)
+// server.js (persistent + image save + presence support)
 // Node >= 14, no extra npm deps required
 const express = require('express');
 const http = require('http');
@@ -26,6 +26,9 @@ const DATA_DIR = path.join(__dirname, 'data');
 const POSTS_FILE = path.join(DATA_DIR, 'posts.json');
 const MESSAGES_FILE = path.join(DATA_DIR, 'messages.json');
 const UPLOADS_DIR = path.join(__dirname, 'public', 'uploads');
+// Presence settings
+const PRESENCE_TTL_MS = 45 * 1000;   // consider offline if no heartbeat within 45s
+const PRESENCE_PRUNE_INTERVAL = 20 * 1000; // prune every 20s
 // ====================
 
 const io = new Server(server, {
@@ -116,6 +119,103 @@ function pushMessageToCache(msg){
   if(MESSAGES_CACHE.length > MESSAGES_CACHE_MAX) MESSAGES_CACHE.splice(0, MESSAGES_CACHE.length - MESSAGES_CACHE_MAX);
 }
 
+// ----------------- PRESENCE (in-memory) -----------------
+// presenceByUser: Map<userId, { userId, userName, lastSeen: ISO, sockets: Set(socketId), status?: 'active'|'away' }>
+const presenceByUser = new Map();
+// map socketId -> userId for quick reverse lookup
+const socketIdToUserId = new Map();
+
+function getActiveUsersArray(){
+  // Return array of simplified presence objects for clients
+  const arr = [];
+  for(const [userId, entry] of presenceByUser.entries()){
+    arr.push({
+      userId: entry.userId,
+      userName: entry.userName,
+      lastSeen: entry.lastSeen,
+      status: entry.status || 'active',
+      sockets: Array.from(entry.sockets) // optional, can be omitted
+    });
+  }
+  return arr;
+}
+
+function broadcastPresenceUpdate(){
+  const payload = getActiveUsersArray();
+  // preferred event name: presence:update
+  io.emit('presence:update', payload);
+  // compatibility fallback for older clients
+  io.emit('activeUsers', payload);
+}
+
+// Add or refresh presence for a user
+function upsertPresence(userId, userName, socketId, meta = {}){
+  if(!userId) return;
+  let entry = presenceByUser.get(userId);
+  const ts = new Date().toISOString();
+  if(!entry){
+    entry = { userId, userName: userName || 'Anonymous', lastSeen: ts, sockets: new Set(), status: 'active', meta: meta || {} };
+    presenceByUser.set(userId, entry);
+  }
+  entry.userName = userName || entry.userName;
+  entry.lastSeen = ts;
+  entry.status = meta.status || entry.status || 'active';
+  if(socketId) entry.sockets.add(socketId);
+  socketIdToUserId.set(socketId, userId);
+  broadcastPresenceUpdate();
+}
+
+// Remove a socket mapping; if user has no sockets left, remove user presence
+function removeSocketForUser(socketId){
+  const userId = socketIdToUserId.get(socketId);
+  if(!userId) return;
+  socketIdToUserId.delete(socketId);
+  const entry = presenceByUser.get(userId);
+  if(!entry) return;
+  entry.sockets.delete(socketId);
+  if(entry.sockets.size === 0){
+    // mark offline by removing entry
+    presenceByUser.delete(userId);
+    broadcastPresenceUpdate();
+  } else {
+    // still sockets left: update lastSeen and broadcast
+    entry.lastSeen = new Date().toISOString();
+    broadcastPresenceUpdate();
+  }
+}
+
+// Explicit leave (client asked to leave)
+function handlePresenceLeave(userId, socketId){
+  if(!userId) return;
+  const entry = presenceByUser.get(userId);
+  if(!entry) return;
+  if(socketId) entry.sockets.delete(socketId);
+  if(entry.sockets.size === 0){
+    presenceByUser.delete(userId);
+  }
+  // clean reverse map
+  if(socketId) socketIdToUserId.delete(socketId);
+  broadcastPresenceUpdate();
+}
+
+// prune stale presences by TTL
+function pruneStalePresence(){
+  const cutoff = Date.now() - PRESENCE_TTL_MS;
+  let changed = false;
+  for(const [userId, entry] of presenceByUser.entries()){
+    const last = new Date(entry.lastSeen).getTime();
+    if(isNaN(last) || last < cutoff){
+      presenceByUser.delete(userId);
+      // also remove any socketId->user mappings for those sockets
+      for(const sid of entry.sockets) socketIdToUserId.delete(sid);
+      changed = true;
+    }
+  }
+  if(changed) broadcastPresenceUpdate();
+}
+setInterval(pruneStalePresence, PRESENCE_PRUNE_INTERVAL);
+// -------------------------------------------------------
+
 // serve static
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -133,6 +233,76 @@ io.on('connection', (socket) => {
 
   socket.on('request_messages', () => {
     try { socket.emit('messages_sync', MESSAGES_CACHE.slice()); } catch(e){ console.warn('failed sending messages_sync', e); }
+  });
+
+  // PRESENCE EVENTS
+  socket.on('presence:join', (payload) => {
+    try {
+      if(!payload) return;
+      const userId = payload.userId || payload.id;
+      const userName = payload.userName || payload.name || (payload.user && payload.user.name);
+      upsertPresence(userId, userName, socket.id, { status: 'active', meta: payload.meta || null });
+      // acknowledge to requester with current list
+      socket.emit('presence:update', getActiveUsersArray());
+      console.log('[PRES] join', userId, 'socket', socket.id);
+    } catch(e) { console.error('[PRES] join err', e); }
+  });
+
+  socket.on('presence:heartbeat', (payload) => {
+    try {
+      if(!payload) return;
+      const userId = payload.userId || payload.id;
+      const entry = presenceByUser.get(userId);
+      if(entry){
+        entry.lastSeen = new Date().toISOString();
+        // if provided meta/status update it
+        if(payload.status) entry.status = payload.status;
+        broadcastPresenceUpdate();
+      } else {
+        // If no entry yet, upsert (covers reconnect cases)
+        upsertPresence(userId, payload.userName || payload.name || 'Anonymous', socket.id, { status: payload.status || 'active' });
+      }
+    } catch(e){ console.error('[PRES] heartbeat err', e); }
+  });
+
+  socket.on('presence:away', (payload) => {
+    try {
+      if(!payload) return;
+      const userId = payload.userId || payload.id;
+      const entry = presenceByUser.get(userId);
+      if(entry){
+        entry.status = 'away';
+        entry.lastSeen = new Date().toISOString();
+      } else {
+        upsertPresence(userId, payload.userName || 'Anonymous', socket.id, { status: 'away' });
+      }
+      broadcastPresenceUpdate();
+    } catch(e){ console.error('[PRES] away err', e); }
+  });
+
+  socket.on('presence:back', (payload) => {
+    try {
+      if(!payload) return;
+      const userId = payload.userId || payload.id;
+      upsertPresence(userId, payload.userName || 'Anonymous', socket.id, { status: 'active' });
+    } catch(e){ console.error('[PRES] back err', e); }
+  });
+
+  socket.on('presence:leave', (payload) => {
+    try {
+      if(!payload) return;
+      const userId = payload.userId || payload.id;
+      handlePresenceLeave(userId, socket.id);
+      console.log('[PRES] leave', userId, 'socket', socket.id);
+    } catch(e){ console.error('[PRES] leave err', e); }
+  });
+
+  socket.on('presence:request', () => {
+    try {
+      socket.emit('presence:update', getActiveUsersArray());
+      // compat
+      socket.emit('activeUsers', getActiveUsersArray());
+    } catch(e){ console.warn('failed presence:request', e); }
   });
 
   // NEW POST (image upload)
@@ -213,6 +383,8 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', (reason) => {
     console.log('[SOCKET] disconnected', socket.id, reason);
+    // remove socket reference from presence
+    removeSocketForUser(socket.id);
   });
 });
 
