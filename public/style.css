@@ -1,0 +1,228 @@
+:root{
+  --c1:#7c3aed; --c2:#0ea5e9; --bg:#0b1020; --card:#071028; --text:#e5e7eb; --muted:#9aa4bf;
+  --glass: rgba(255,255,255,0.03); --radius:14px; --gap:14px; --accent:linear-gradient(90deg,var(--c1),var(--c2));
+  /* estimated header height used to reserve space for sticky header */
+  --header-h: 72px;
+}
+
+/* box sizing */
+*{box-sizing:border-box}
+
+/* base */
+html,body{
+  height:100%;
+  margin:0;
+  padding:0;
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;
+  color:var(--text);
+  background:linear-gradient(135deg,#071026 0%,#03040a 100%);
+  -webkit-font-smoothing:antialiased;
+  overflow-x: hidden;       /* disable horizontal page scroll */
+  -webkit-text-size-adjust:100%;
+  touch-action: pan-y;      /* prefer vertical scrolling on touch */
+  overscroll-behavior-x: none;
+}
+
+/* App container
+   Reserve top padding so feed/content doesn't get hidden under the sticky header.
+   We add the header height + the original top margin (18px) so visual spacing is preserved.
+*/
+.wrap{
+  max-width:1200px;
+  margin:18px auto;
+  padding:18px;
+  padding-top: calc(18px + var(--header-h)); /* ensure content starts below sticky header */
+}
+
+/* Sticky header — make sure it sits above everything (big z-index),
+   and give it a slightly more solid background so content beneath doesn't show through.
+*/
+header.app{
+  display:flex;
+  flex-wrap:wrap;           /* allow wrapping so items can move to new rows */
+  align-items:center;
+  gap:12px;
+  position:sticky;
+  top:0;                    /* stick to very top of viewport */
+  z-index:10050;            /* very high so images / overlays don't cover it */
+  padding:12px;
+  border-radius:0 0 12px 12px; /* rounded bottom only */
+  background:linear-gradient(180deg, rgba(6,10,20,0.92), rgba(6,10,20,0.88)); /* more opaque */
+  border:1px solid rgba(255,255,255,0.04);
+  backdrop-filter:blur(8px);
+  /* expose approximate height for CSS spacing above */
+  min-height: var(--header-h);
+}
+
+/* brand */
+.logo{width:48px;height:48px;border-radius:10px;background:conic-gradient(from 0deg,var(--c1),var(--c2));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700}
+h1.title{margin:0;font-size:18px;background:var(--accent);-webkit-background-clip:text;color:transparent}
+
+/* header right (the thing beside search) */
+.header-right{margin-left:auto;display:flex;gap:10px;align-items:center}
+.search-wrap{display:flex;gap:8px;align-items:center}
+.search-wrap input{padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.02);color:var(--text);min-width:220px}
+.search-wrap button{padding:8px 12px;border-radius:10px;border:0;background:var(--accent);color:#05070f;font-weight:600;cursor:pointer}
+.id-badge{padding:8px 10px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border:1px solid rgba(255,255,255,0.03);font-size:13px;color:var(--muted);cursor:pointer}
+
+/* Upload card */
+.card.upload{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px;margin-top:16px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.03)}
+.upload .file{flex:1 1 260px}
+input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.02);color:var(--text)}
+.primary{padding:10px 14px;border-radius:999px;border:0;background:var(--accent);color:#05070f;font-weight:700;cursor:pointer}
+
+/* Feed grid */
+#feed{margin-top:18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:var(--gap)}
+.post{position:relative; z-index:1; /* keep posts below header */ 
+  background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));
+  border:1px solid rgba(255,255,255,0.03);
+  border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;transition:transform 180ms ease, box-shadow 180ms ease}
+.post:hover{transform:translateY(-6px);box-shadow:0 12px 30px rgba(2,6,23,0.6)}
+.meta{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px}
+
+/* Image frame */
+.img-frame{position:relative;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:8px; z-index:1}
+.img-frame.aspect-16-10{aspect-ratio:16/10}
+.img-frame.aspect-4-3{aspect-ratio:4/3}
+.post-img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;cursor:zoom-in;transition:transform 220ms cubic-bezier(.2,.9,.2,1); z-index:1}
+
+.caption{font-size:14px;color:var(--text);min-height:1.1em}
+.actions{display:flex;gap:8px;align-items:center}
+.lb-small-btn{padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03);color:var(--muted);cursor:pointer}
+
+/* Comments */
+.comments{margin-top:8px;display:flex;flex-direction:column;gap:8px}
+.comment-item{font-size:13px;color:var(--muted);background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.02)}
+.comment-form{display:flex;gap:8px;align-items:center;margin-top:6px}
+.comment-form input{flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.01);color:var(--text)}
+.comment-form button{padding:8px 10px;border-radius:8px;border:0;background:var(--accent);color:#05070f;font-weight:600;cursor:pointer}
+
+/* comment count visual */
+.lb-small-btn .comment-count{ margin-left:6px; font-weight:700; color:var(--text); }
+
+/* Lightbox / viewer
+   Make sure its z-index is below header so header stays on top.
+   (If you actually want lightbox to cover header, increase its z-index > header)
+*/
+.lightbox-overlay{position:fixed;inset:0;z-index:10030;display:none;align-items:center;justify-content:center;background:linear-gradient(180deg, rgba(2,6,23,0.9), rgba(2,6,23,0.95))}
+.lightbox-overlay.open{display:flex}
+.lightbox-inner{position:relative;max-width:96vw;max-height:96vh;border-radius:12px;display:flex;align-items:center;justify-content:center;background:rgba(8,12,20,0.6);backdrop-filter:blur(8px);padding:18px}
+.lightbox-canvas{width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
+#lbImg{max-width:100%;max-height:100%;object-fit:contain;touch-action:none;user-select:none;cursor:zoom-in;transition:transform 200ms cubic-bezier(.2,.9,.2,1);}
+
+/* keep all lightbox controls under header by default */
+.lb-controls{position:absolute;right:18px;top:18px;display:flex;flex-direction:column;gap:8px}
+.lb-btn{background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.04);padding:10px;border-radius:10px;color:var(--text);cursor:pointer}
+.lb-caption{position:absolute;left:18px;bottom:18px;color:var(--muted);font-size:13px;max-width:70vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lb-hint{position:absolute;left:50%;transform:translateX(-50%);top:18px;color:var(--muted);font-size:13px}
+
+/* Chat / floating UI */
+.chat-button{
+  position:fixed; right:18px; bottom:18px; z-index:10060; width:56px; height:56px; border-radius:999px;
+  display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow: 0 8px 24px rgba(2,6,23,0.6);
+  background:linear-gradient(180deg,var(--c2),var(--c1)); color:#fff; border: none; font-size:20px;
+  transition:transform .12s ease;
+}
+.chat-button:hover{ transform:translateY(-4px) }
+.chat-unread{
+  position:absolute; top:6px; right:6px; min-width:18px; height:18px; border-radius:999px; padding:0 6px;
+  background:#ff4d6d; color:#fff; font-weight:700; font-size:11px; display:flex; align-items:center; justify-content:center;
+}
+
+.chat-panel{
+  position:fixed; right:18px; bottom:86px; width:320px; max-width:92vw; height:420px; z-index:10055;
+  background:linear-gradient(180deg, rgba(8,12,20,0.95), rgba(4,6,10,0.95)); border:1px solid rgba(255,255,255,0.04);
+  border-radius:12px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 40px rgba(2,6,23,0.7);
+}
+.chat-header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.02); font-weight:700; color:var(--muted)}
+.chat-messages{flex:1;padding:10px; overflow:auto; display:flex; flex-direction:column; gap:8px; }
+.chat-msg{background:rgba(255,255,255,0.02);padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.02); font-size:13px; color:var(--muted);}
+.chat-msg strong{color:var(--text); display:block; font-size:12px;}
+.chat-input{display:flex; gap:8px; padding:10px; border-top:1px solid rgba(255,255,255,0.01);}
+.chat-input input{flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.01);color:var(--text)}
+.chat-input button{padding:8px 12px;border-radius:8px;border:0;background:var(--accent);color:#05070f;font-weight:700;cursor:pointer}
+
+/* responsive tweaks (unchanged default behavior for mid/large screens) */
+@media (max-width:900px){
+  .wrap{padding:12px}
+  header.app{padding:10px}
+  #feed{grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+  .lightbox-inner{padding:12px}
+  .lb-controls{right:12px;top:12px;flex-direction:row}
+  .lb-btn{padding:8px}
+  .chat-panel{width:92vw; right:4vw; left:4vw; bottom:86px}
+}
+
+/* ========== MOBILE: move header-right below search & force single column ========== */
+/* On small screens we want:
+   - feed: single column
+   - header: keep logo/title on top row, make .search-wrap full-width next row,
+     and move .header-right to its own full-width row below the search.
+*/
+@media (max-width:768px){
+  /* feed single column */
+  #feed{ grid-template-columns: 1fr !important; gap:12px }
+
+  /* header layout: allow wrapping and full-width rows for search & right area */
+  header.app{
+    align-items:center;
+    gap:10px;
+    /* smaller header on mobile: reduce reserved header height */
+    min-height: 72px;
+  }
+
+  /* control ordering so elements appear as:
+     (logo) (title)  -> first row (they wrap naturally if space)
+     .search-wrap    -> full width next row
+     .header-right   -> full width bottom row
+  */
+  .logo{ order: 0; flex: 0 0 auto; }
+  h1.title{ order: 1; flex: 1 1 auto; min-width: 0; }
+
+  /* make search full width and appear before header-right */
+  .search-wrap{
+    order: 2;
+    flex: 1 1 100%;
+    width: 100%;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:6px;
+  }
+  .search-wrap input{ min-width: 0; width: 100%; }
+
+  /* header-right moves to its own row under the search */
+  .header-right{
+    order: 3;
+    margin-left: 0;          /* remove auto margin so it sits full-width */
+    flex: 1 1 100%;
+    width: 100%;
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    justify-content: flex-start; /* align items to left, change as desired */
+    margin-top:8px;
+  }
+
+  /* make badges and buttons touch-friendly on mobile */
+  .id-badge, .lb-small-btn, .primary, .search-wrap button {
+    min-height:44px;
+    padding-inline:12px;
+  }
+
+  /* light adjustments */
+  header.app{ padding-left:12px; padding-right:12px; }
+}
+
+/* very small screens */
+@media (max-width:480px){
+  .logo{ width:44px; height:44px; }
+  h1.title{ font-size:16px; }
+  .search-wrap{ gap:6px; margin-top:6px; }
+  .header-right{ gap:6px; margin-top:6px; }
+  .wrap{ padding:12px; padding-top: calc(12px + var(--header-h)); }
+  #feed{ gap:10px }
+}
+
+/* accessibility */
+button:focus, .post:focus-within{outline:2px solid rgba(124,58,237,0.25);outline-offset:3px}
