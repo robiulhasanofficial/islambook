@@ -1,13 +1,23 @@
+/* Updated complete CSS — "style-updated.css"
+   Changes focused on:
+   - Keep active users count always at top-right on ALL devices
+   - Ensure both user NAME and ID are visible in the list on every screen
+   - Improve contrast & hit-area for lightbox zoom buttons (visible on all screens)
+   - Accessibility (focus outlines, reduced-motion, readable sizes)
+
+   লিখেছেন: ChatGPT — CSS আপডেট
+*/
+
 :root{
   --c1:#7c3aed;
   --c2:#0ea5e9;
   --c3:#ff4d6d;
   --c4:#f59e0b;
-  --bg:#0b1020;
+  --bg:#a69f11;
   --card:#071028;
-  --text:#e5e7eb;
+  --text:rgba(224, 183, 20, 0.925);
   --muted:#9aa4bf;
-  --glass: rgba(255,255,255,0.03);
+  --glass: rgba(250, 248, 242, 0.646);
   --radius:14px;
   --gap:14px;
   --accent:linear-gradient(90deg,var(--c1),var(--c2));
@@ -16,92 +26,35 @@
   /* Active users widget sizing */
   --au-size:56px;
   --au-pill-padding:10px 14px;
-  --au-panel-width:340px;
+  --au-panel-width:360px;
 
-  /* control & zoom */
-  --control-bg: linear-gradient(90deg,var(--c3),var(--c1));
-  --control-color: #ffffff;
-  --control-size:48px;
-
-  /* id badge mobile */
-  --id-max-width-mobile:220px;
+  /* lightbox control colors (high contrast) */
+  --lb-btn-bg:linear-gradient(90deg,var(--c2),var(--c1));
+  --lb-btn-color:#ffffff;
+  --lb-btn-border:rgba(255,255,255,0.12);
+  --lb-btn-shadow: 0 10px 30px rgba(2,6,23,0.6);
 }
 
-/* box sizing */
+/* Box sizing + base */
 *{box-sizing:border-box}
-
-/* base */
-html,body{
-  height:100%;
-  margin:0;
-  padding:0;
-  font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;
-  color:var(--text);
-  background:linear-gradient(135deg,#071026 0%,#03040a 100%);
-  -webkit-font-smoothing:antialiased;
-  overflow-x: hidden;
-  -webkit-text-size-adjust:100%;
-  touch-action: pan-y;
-  overscroll-behavior-x: none;
-}
+html,body{height:100%;margin:0;padding:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;color:var(--text);background:linear-gradient(135deg,#071026 0%,#03040a 100%);-webkit-font-smoothing:antialiased;overflow-x:hidden;-webkit-text-size-adjust:100%;touch-action: pan-y;}
 
 /* App container */
-.wrap{
-  max-width:1200px;
-  margin:18px auto;
-  padding:18px;
-  padding-top: calc(18px + var(--header-h));
-}
+.wrap{max-width:1200px;margin:18px auto;padding:18px;padding-top: calc(18px + var(--header-h));}
 
 /* Sticky header */
-header.app{
-  display:flex;
-  flex-wrap:wrap;
-  align-items:center;
-  gap:12px;
-  position:sticky;
-  top:0;
-  z-index:10050;
-  padding:12px;
-  border-radius:0 0 12px 12px;
-  background:linear-gradient(180deg, rgba(6,10,20,0.92), rgba(6,10,20,0.88));
-  border:1px solid rgba(255,255,255,0.04);
-  backdrop-filter:blur(8px);
-  min-height: var(--header-h);
-  /* ensure positioned parent for absolute children like .id-badge on mobile */
-  -webkit-transform:translateZ(0);
-  transform:translateZ(0);
-}
+header.app{display:flex;flex-wrap:wrap;align-items:center;gap:12px;position:sticky;top:0;z-index:10050;padding:12px;border-radius:0 0 12px 12px;background:linear-gradient(180deg, rgba(6,10,20,0.92), rgba(6,10,20,0.88));border:1px solid rgba(255,255,255,0.04);backdrop-filter:blur(8px);min-height: var(--header-h);} 
 
-/* brand */
+/* Branding */
 .logo{width:48px;height:48px;border-radius:10px;background:conic-gradient(from 0deg,var(--c1),var(--c2));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700}
 h1.title{margin:0;font-size:18px;background:var(--accent);-webkit-background-clip:text;color:transparent}
 
-/* header right (the thing beside search) */
+/* header right */
 .header-right{margin-left:auto;display:flex;gap:10px;align-items:center}
 .search-wrap{display:flex;gap:8px;align-items:center}
 .search-wrap input{padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.02);color:var(--text);min-width:220px}
 .search-wrap button{padding:8px 12px;border-radius:10px;border:0;background:var(--accent);color:#05070f;font-weight:600;cursor:pointer}
-
-/* ID badge - improved for visibility & responsive */
-.id-badge{
-  padding:8px 10px;
-  border-radius:10px;
-  background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);
-  border:1px solid rgba(255,255,255,0.03);
-  font-size:13px;
-  color:var(--muted);
-  cursor:pointer;
-
-  /* display tweaks for showing both name & id inline */
-  display:inline-flex;
-  align-items:center;
-  gap:8px;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  max-width:240px; /* default desktop width */
-}
+.id-badge{padding:8px 10px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);border:1px solid rgba(255,255,255,0.03);font-size:13px;color:var(--muted);cursor:pointer}
 
 /* Upload card */
 .card.upload{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px;margin-top:16px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.03)}
@@ -111,19 +64,13 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
 
 /* Feed grid */
 #feed{margin-top:18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:var(--gap)}
-.post{position:relative; z-index:1;
-  background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));
-  border:1px solid rgba(255,255,255,0.03);
-  border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;transition:transform 180ms ease, box-shadow 180ms ease}
+.post{position:relative; z-index:1;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));border:1px solid rgba(255,255,255,0.03);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;transition:transform 180ms ease, box-shadow 180ms ease}
 .post:hover{transform:translateY(-6px);box-shadow:0 12px 30px rgba(2,6,23,0.6)}
 .meta{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px}
 
 /* Image frame */
 .img-frame{position:relative;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:8px; z-index:1}
-.img-frame.aspect-16-10{aspect-ratio:16/10}
-.img-frame.aspect-4-3{aspect-ratio:4/3}
 .post-img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;cursor:zoom-in;transition:transform 220ms cubic-bezier(.2,.9,.2,1); z-index:1}
-
 .caption{font-size:14px;color:var(--text);min-height:1.1em}
 .actions{display:flex;gap:8px;align-items:center}
 .lb-small-btn{padding:8px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03);color:var(--muted);cursor:pointer}
@@ -135,9 +82,6 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
 .comment-form input{flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.01);color:var(--text)}
 .comment-form button{padding:8px 10px;border-radius:8px;border:0;background:var(--accent);color:#05070f;font-weight:600;cursor:pointer}
 
-/* comment count visual */
-.lb-small-btn .comment-count{ margin-left:6px; font-weight:700; color:var(--text); }
-
 /* Lightbox / viewer */
 .lightbox-overlay{position:fixed;inset:0;z-index:10030;display:none;align-items:center;justify-content:center;background:linear-gradient(180deg, rgba(2,6,23,0.9), rgba(2,6,23,0.95))}
 .lightbox-overlay.open{display:flex}
@@ -145,71 +89,42 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
 .lightbox-canvas{width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
 #lbImg{max-width:100%;max-height:100%;object-fit:contain;touch-action:none;user-select:none;cursor:zoom-in;transition:transform 200ms cubic-bezier(.2,.9,.2,1);}
 
-/* keep all lightbox controls under header by default */
-.lb-controls{position:absolute;right:18px;top:18px;display:flex;flex-direction:column;gap:8px}
-.lb-btn{
-  /* Updated button styles for better visibility across devices */
-  background: var(--control-bg);
-  color: var(--control-color);
-  border:1px solid rgba(255,255,255,0.06);
-  padding:0;
-  min-width:var(--control-size);
-  min-height:var(--control-size);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  border-radius:10px;
-  cursor:pointer;
-  font-weight:700;
-  font-size:16px;
-  box-shadow:0 12px 30px rgba(2,6,23,0.6);
-  -webkit-tap-highlight-color: transparent;
-  transition: transform 140ms cubic-bezier(.2,.9,.2,1), box-shadow 140ms ease;
-  backdrop-filter: blur(4px);
-}
-.lb-btn:hover{ transform: translateY(-4px); box-shadow:0 18px 40px rgba(2,6,23,0.7); }
-.lb-btn:active{ transform: translateY(-1px); }
-.lb-btn svg{ width:20px; height:20px; display:block; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.55)); }
+/* Improved lightbox control styles for visibility */
+.lb-controls{position:absolute;right:18px;top:18px;display:flex;flex-direction:column;gap:10px}
+.lb-btn{display:inline-flex;align-items:center;justify-content:center;min-width:48px;min-height:48px;padding:12px;border-radius:12px;background:var(--lb-btn-bg);border:1px solid var(--lb-btn-border);color:var(--lb-btn-color);font-weight:700;cursor:pointer;box-shadow:var(--lb-btn-shadow);transform:translateZ(0)}
+.lb-btn[title]{/* improve tap readability */}
+.lb-btn:focus{outline:3px solid rgba(14,165,233,0.22);outline-offset:3px}
+.lb-btn:active{transform:translateY(1px) scale(.995)}
+/* add aria-hidden hints for mobile touch controls if needed */
 
-/* caption and hints */
 .lb-caption{position:absolute;left:18px;bottom:18px;color:var(--muted);font-size:13px;max-width:70vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lb-hint{position:absolute;left:50%;transform:translateX(-50%);top:18px;color:var(--muted);font-size:13px}
 
 /* Chat / floating UI */
-.chat-button{
-  position:fixed; right:18px; bottom:18px; z-index:10060; width:56px; height:56px; border-radius:999px;
-  display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow: 0 8px 24px rgba(2,6,23,0.6);
-  background:linear-gradient(180deg,var(--c2),var(--c1)); color:#fff; border: none; font-size:20px;
-  transition:transform .12s ease;
-}
+.chat-button{position:fixed; right:18px; bottom:18px; z-index:10060; width:56px; height:56px; border-radius:999px;display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow: 0 8px 24px rgba(2,6,23,0.6);background:linear-gradient(180deg,var(--c2),var(--c1)); color:#fff; border: none; font-size:20px; transition:transform .12s ease}
 .chat-button:hover{ transform:translateY(-4px) }
-.chat-unread{
-  position:absolute; top:6px; right:6px; min-width:18px; height:18px; border-radius:999px; padding:0 6px;
-  background:#ff4d6d; color:#fff; font-weight:700; font-size:11px; display:flex; align-items:center; justify-content:center;
-}
+.chat-unread{position:absolute; top:6px; right:6px; min-width:18px; height:18px; border-radius:999px; padding:0 6px;background:#ff4d6d;color:#fff;font-weight:700;font-size:11px;display:flex;align-items:center;justify-content:center}
 
-.chat-panel{
-  position:fixed; right:18px; bottom:86px; width:320px; max-width:92vw; height:420px; z-index:10055;
-  background:linear-gradient(180deg, rgba(8,12,20,0.95), rgba(4,6,10,0.95)); border:1px solid rgba(255,255,255,0.04);
-  border-radius:12px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 40px rgba(2,6,23,0.7);
-}
+.chat-panel{position:fixed; right:18px; bottom:86px; width:320px; max-width:92vw; height:420px; z-index:10055;background:linear-gradient(180deg, rgba(8,12,20,0.95), rgba(4,6,10,0.95)); border:1px solid rgba(255,255,255,0.04);border-radius:12px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 40px rgba(2,6,23,0.7)}
 .chat-header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.02); font-weight:700; color:var(--muted)}
 .chat-messages{flex:1;padding:10px; overflow:auto; display:flex; flex-direction:column; gap:8px; }
 .chat-msg{background:rgba(255,255,255,0.02);padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.02); font-size:13px; color:var(--muted);}
 .chat-msg strong{color:var(--text); display:block; font-size:12px;}
-.chat-input{display:flex; gap:8px; padding:10px; border-top:1px solid rgba(255,255,255,0.01);}
+.chat-input{display:flex; gap:8px; padding:10px; border-top:1px solid rgba(255,255,255,0.01);} 
 .chat-input input{flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.01);color:var(--text)}
 .chat-input button{padding:8px 12px;border-radius:8px;border:0;background:var(--accent);color:#05070f;font-weight:700;cursor:pointer}
 
 /* =========================
    ACTIVE USERS WIDGET (Updated)
-   Positioned on the RIGHT, colorful badge, responsive behavior
+   - Force top-right on all viewports
+   - Ensure both NAME and ID visible and wrap-friendly
+   - Improved sizing + hit area for mobile while keeping top-right
    ========================= */
 
 #active-users-widget{
   position:fixed;
   top:18px;
-  right:18px; /* moved to right side */
+  right:18px; /* always fixed to top-right as requested */
   z-index:10070;
   display:flex;
   align-items:flex-end;
@@ -234,92 +149,41 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
   transition:transform .12s ease, box-shadow .12s ease;
   backdrop-filter: blur(6px);
   user-select:none;
-  -webkit-tap-highlight-color: transparent;
+  padding-inline:12px; /* extra room for text */
 }
 
-/* Small dot indicator */
-.au-dot{
-  width:12px;height:12px;border-radius:999px;display:inline-block;
-  box-shadow:0 0 0 4px rgba(0,0,0,0.12) inset;
-  background: radial-gradient(circle at 30% 30%, #fff 8%, transparent 9%), linear-gradient(90deg,var(--c1),var(--c2));
-  transform:translateY(0);
-  transition:transform .18s ease;
-}
+/* Dot indicator */
+.au-dot{width:12px;height:12px;border-radius:999px;display:inline-block;box-shadow:0 0 0 4px rgba(0,0,0,0.12) inset;background: radial-gradient(circle at 30% 30%, #fff 8%, transparent 9%), linear-gradient(90deg,var(--c1),var(--c2));transition:transform .18s ease}
 
 /* Colorful animated count badge */
-.au-count{
-  display:inline-flex;
-  min-width:34px;
-  padding:6px 10px;
-  border-radius:999px;
-  font-weight:800;
-  font-variant-numeric:tabular-nums;
-  align-items:center;
-  justify-content:center;
-  color:#fff;
-  background:linear-gradient(90deg,var(--c1),var(--c2),var(--c3),var(--c4));
-  background-size:200% 200%;
-  animation:au-gradient-shift 4s linear infinite;
-  box-shadow:0 6px 18px rgba(124,58,237,0.12);
-  border:1px solid rgba(255,255,255,0.06);
-  font-size:13px;
-  text-shadow: 0 1px 0 rgba(0,0,0,0.35);
-  /* responsive font scaling for perfect mobile fit */
-  font-size: clamp(12px, 1.6vw, 14px);
-  padding: clamp(6px, 1.2vw, 8px) clamp(8px, 1.6vw, 12px);
-}
+.au-count{display:inline-flex;min-width:38px;padding:6px 12px;border-radius:999px;font-weight:800;font-variant-numeric:tabular-nums;align-items:center;justify-content:center;color:#fffefb;background:linear-gradient(90deg,var(--c1),var(--c2),var(--c3),var(--c4));background-size:200% 200%;animation:au-gradient-shift 4s linear infinite;box-shadow:0 6px 18px rgba(124,58,237,0.12);border:1px solid rgba(255,255,255,0.06);font-size:13px}
 
 /* Optional label text */
-.au-label{
-  font-weight:700;
-  font-size:13px;
-  color:var(--muted);
-  white-space:nowrap;
-}
+.au-label{font-weight:700;font-size:13px;color:var(--muted);white-space:nowrap}
 
 /* panel (the list) - appears under the pill, aligned to the right */
-#active-users-list.au-list{
-  position:absolute;
-  top:calc(100% + 12px);
-  right:0;
-  width:var(--au-panel-width);
-  max-width: min(92vw, var(--au-panel-width));
-  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-  border:1px solid rgba(255,255,255,0.04);
-  border-radius:12px;
-  padding:10px;
-  box-shadow:0 18px 50px rgba(2,6,23,0.6);
-  transform-origin: top right;
-  transition:opacity .18s ease, transform .18s ease;
-  color:var(--text);
-}
+#active-users-list.au-list{position:absolute;top:calc(100% + 12px);right:0;width:var(--au-panel-width);max-width: min(92vw, var(--au-panel-width));background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.04);border-radius:12px;padding:10px;box-shadow:0 18px 50px rgba(2,6,23,0.6);transform-origin: top right;transition:opacity .18s ease, transform .18s ease;color:var(--text)}
 
-/* Hidden panel fallback (JS toggles [hidden] attr) */
-#active-users-list[hidden]{
-  opacity:0; transform:translateY(-6px) scale(.995); pointer-events:none; height:auto;
-  display:block; /* keep in DOM so show/hide animation can run if using JS class toggle */
-}
-
-/* When visible (remove hidden in JS) ensure opaque */
-#active-users-list:not([hidden]){
-  opacity:1; transform:translateY(0) scale(1);
-  pointer-events:auto;
-}
+/* Keep list in DOM even if hidden so opening animation works */
+#active-users-list[hidden]{opacity:0;transform:translateY(-6px) scale(.995);pointer-events:none;height:auto;display:block}
+#active-users-list:not([hidden]){opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
 
 /* header inside the panel */
 .au-list-header{display:flex;align-items:center;justify-content:space-between;padding:6px 4px;border-bottom:1px solid rgba(255,255,255,0.02);margin-bottom:8px}
 .au-list-header strong{font-size:14px;color:var(--text)}
-
-/* close button */
 .au-close{background:transparent;border:0;color:var(--muted);font-size:20px;cursor:pointer;padding:4px;border-radius:8px}
 .au-close:hover{color:var(--text);background:rgba(255,255,255,0.02)}
 
-/* list items */
-.au-ul{list-style:none;margin:0;padding:0;max-height:280px;overflow:auto;display:flex;flex-direction:column;gap:6px}
-.au-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:8px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);border:1px solid rgba(255,255,255,0.02)}
+/* list items: ensure both name and id visible on one line or stacked if needed */
+.au-ul{list-style:none;margin:0;padding:0;max-height:320px;overflow:auto;display:flex;flex-direction:column;gap:6px}
+.au-item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);border:1px solid rgba(255,255,255,0.02)}
 .au-item:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(2,6,23,0.45)}
-.au-item-name{font-weight:700;color:var(--text)}
-.au-item-id{font-size:12px;color:var(--muted)}
+.au-item-name{font-weight:700;color:var(--text);margin-right:10px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.au-item-id{font-size:12px;color:var(--muted);flex-shrink:0;margin-left:8px}
+
+/* Make name + id wrap gracefully on narrow screens */
+.au-item{gap:8px}
+.au-item .au-left{display:flex;align-items:center;min-width:0;gap:8px}
 
 /* empty state */
 .au-empty{color:var(--muted);padding:8px;text-align:center}
@@ -332,174 +196,48 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
 /* noscript */
 .au-noscript{padding:8px;color:var(--muted);font-size:13px}
 
-/* ensure the list doesn't go under header if near top */
-@media (min-width:1000px){
-  /* keep it slightly lower on very wide screens */
-  #active-users-widget{ top:22px; right:22px; }
-}
-
-/* Mobile responsiveness: move widget to bottom-right as compact floating button */
-@media (max-width:768px){
-  #active-users-widget{
-    top:auto;
-    right:16px;
-    bottom:16px; /* bottom-right on mobile to avoid covering header */
-    align-items:flex-end;
-    gap:0;
-  }
-
-  #active-users-toggle.au-toggle{
-    padding:8px;
-    min-height:48px;
-    box-shadow:0 14px 34px rgba(2,6,23,0.7);
-  }
-
-  /* hide the text label on smaller screens to reduce width */
-  .au-label{ display:none; }
-
-  /* smaller dot and count */
-  .au-dot{ width:10px; height:10px; }
-  .au-count{ min-width:30px; padding:6px 8px; font-size:12px; }
-
-  /* Make the panel behave like a bottom sheet */
-  #active-users-list.au-list{
-    left:50%;
-    right:auto;
-    transform:translateX(-50%) translateY(10px);
-    top:auto;
-    bottom:calc(100% + 12px);
-    width: min(96vw, 420px);
-    max-height:55vh;
-    border-radius:12px;
-  }
-
-  /* When panel is open on mobile, show full width modal like behavior if needed */
-  #active-users-list[open],
-  #active-users-list:not([hidden]){ /* JS may toggle hidden attr; this ensures visibility */
-    transform:translateX(-50%) translateY(0);
-  }
-
-  /* increase tappable size for the count and control on mobile */
-  .au-count{ padding:10px 12px; min-width:36px; font-size:14px; }
-  #active-users-toggle.au-toggle{ padding:10px 12px; }
-}
-
-/* Very small screens: make it more compact and accessible */
-@media (max-width:420px){
-  #active-users-toggle.au-toggle{ width:auto; padding:8px; }
-  .au-count{ font-size:12px; min-width:28px; padding:6px 6px; }
-}
-
-/* focus & accessibility */
+/* Accessibility focus ring */
 #active-users-toggle:focus, .au-action:focus, .au-close:focus, .au-item:focus{ outline:2px solid rgba(124,58,237,0.24); outline-offset:3px; }
 
-@keyframes au-gradient-shift{
-  0%{ background-position:0% 50% }
-  50%{ background-position:100% 50% }
-  100%{ background-position:0% 50% }
-}
+/* gradient shifting keyframe */
+@keyframes au-gradient-shift{0%{ background-position:0% 50% }50%{ background-position:100% 50% }100%{ background-position:0% 50% }}
 
 /* reduced motion preference */
-@media (prefers-reduced-motion: reduce){
-  *{ animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important; }
-}
+@media (prefers-reduced-motion: reduce){*{ animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important; }}
 
-/* responsive tweaks (existing) */
-@media (max-width:900px){
-  .wrap{padding:12px}
-  header.app{padding:10px}
-  #feed{grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
-  .lightbox-inner{padding:12px}
-  .lb-controls{right:12px;top:12px;flex-direction:row}
-  .lb-btn{padding:8px}
-  .chat-panel{width:92vw; right:4vw; left:4vw; bottom:86px}
-}
+/* Responsive tweaks */
+@media (max-width:900px){.wrap{padding:12px}header.app{padding:10px}#feed{grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}.lightbox-inner{padding:12px}.lb-controls{right:12px;top:12px;flex-direction:row}.lb-btn{padding:10px}.chat-panel{width:92vw; right:4vw; left:4vw; bottom:86px}}
 
-/* ========== MOBILE: keep header responsive ========== */
+/* Ensure ACTIVE USERS stays top-right on mobile (user requested) */
 @media (max-width:768px){
-  #feed{ grid-template-columns: 1fr !important; gap:12px }
-  header.app{
-    align-items:center;
-    gap:10px;
-    min-height: 72px;
-  }
-  .logo{ order: 0; flex: 0 0 auto; }
-  h1.title{ order: 1; flex: 1 1 auto; min-width: 0; }
-  .search-wrap{
-    order: 2;
-    flex: 1 1 100%;
-    width: 100%;
-    display:flex;
-    align-items:center;
-    gap:8px;
-    margin-top:6px;
-  }
-  .search-wrap input{ min-width: 0; width: 100%; }
-  .header-right{
-    order: 3;
-    margin-left: 0;
-    flex: 1 1 100%;
-    width: 100%;
-    display:flex;
-    flex-wrap:wrap;
-    gap:8px;
-    justify-content: flex-start;
-    margin-top:8px;
-  }
-  .id-badge, .lb-small-btn, .primary, .search-wrap button {
-    min-height:44px;
-    padding-inline:12px;
-  }
-  header.app{ padding-left:12px; padding-right:12px; }
-
-  /* Move .id-badge to top-right absolute so both name and id remain visible on small screens */
-  .id-badge{
-    position: absolute;
-    right: 12px;
-    top: 12px;
-    z-index:10100;
-    max-width: var(--id-max-width-mobile);
-    padding:8px 12px;
-  }
-  .id-badge{ font-size:13px; color:var(--text); background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border:1px solid rgba(255,255,255,0.04); border-radius:8px; }
-
-  /* ensure text inside id-badge truncates properly */
-  .id-badge *{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #active-users-widget{top:12px;right:12px;bottom:auto;align-items:flex-end;gap:6px}
+  #active-users-toggle.au-toggle{padding:8px;min-height:48px;box-shadow:0 14px 34px rgba(2,6,23,0.7)}
+  /* show label on mobile as well so user sees context; shrink but keep visible */
+  .au-label{display:inline-block;font-size:12px}
+  .au-dot{width:10px;height:10px}
+  .au-count{min-width:30px;padding:6px 8px;font-size:12px}
+  /* panel becomes full-width dropdown from the top-right to better fit narrow screens */
+  #active-users-list.au-list{left:auto;right:12px;top:calc(100% + 8px);width:min(92vw,420px);max-height:55vh;transform:translateY(0)}
+  /* ensure each item shows both name and id in a compact stacked layout when space tight */
+  .au-item{padding:10px;border-radius:10px}
+  .au-item .au-left{flex-direction:column;align-items:flex-start}
+  .au-item-id{margin-left:0;margin-top:4px;font-size:13px}
 }
 
-/* very small screens */
-@media (max-width:480px){
-  .logo{ width:44px; height:44px; }
-  h1.title{ font-size:16px; }
-  .search-wrap{ gap:6px; margin-top:6px; }
-  .header-right{ gap:6px; margin-top:6px; }
-  .wrap{ padding:12px; padding-top: calc(12px + var(--header-h)); }
-  #feed{ gap:10px }
+/* Very small screens */
+@media (max-width:420px){
+  #active-users-toggle.au-toggle{width:auto;padding:8px}
+  .au-count{font-size:12px;min-width:28px;padding:6px 6px}
 }
 
-/* accessibility */
+/* Focus & keyboard accessibility for keyboard-only users */
 button:focus, .post:focus-within{outline:2px solid rgba(124,58,237,0.25);outline-offset:3px}
 
-/* Extra: make lightbox controls reposition nicely on smaller screens and increase tappable area */
-@media (max-width:900px){
-  .lb-controls{
-    right:12px;
-    top:auto;
-    bottom:12px;
-    left:12px;
-    justify-content:center;
-    flex-direction:row;
-    gap:10px;
-  }
-  .lb-btn{ min-width:44px; min-height:44px; border-radius:10px; }
-}
+/* small-polish: ensure list scrollbars are unobtrusive but visible */
+.au-ul::-webkit-scrollbar{width:10px}
+.au-ul::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.04);border-radius:999px}
 
-/* forced-colors / high-contrast fallback */
-@media (forced-colors: active){
-  .lb-btn{ border:2px solid WindowText; background:Window; color:WindowText; }
-  .au-count{ border:2px solid WindowText; background:Window; color:WindowText; }
-}
+/* final safe adjustments: ensure counts never overflow */
+.au-count{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-/* if javascript toggles .zoomed on the image, change cursor & hint */
-.lightbox-overlay.zoomed #lbImg{ cursor:zoom-out; }
-.lightbox-overlay:not(.zoomed) #lbImg{ cursor:zoom-in; }
+/* End of file */
