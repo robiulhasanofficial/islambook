@@ -1,9 +1,11 @@
 // script.js — Combined app logic + Active Users widget
-// Paste/replace your existing script.js with this file. It includes:
-// - existing app logic (posts, IndexedDB, uploads, lightbox, chat)
-// - NEW: Active Users widget (top-left) with socket presence handling, UI, copy list, refresh
+// UPDATED: compatibility with server-side auto-sync protocol
+// - emits `upload_full_post` (and keeps `new_post` for backward compatibility)
+// - responds to `please_announce_posts` by sending `announce_posts` (metadata)
+// - handles `request_upload_posts` by uploading missing posts via `upload_full_post`
+// - handles `sync_needed` by requesting server posts via `request_posts_by_id`
+// - processes `bulk_posts` from server (save + render)
 
-// ------------------ Bootstrap / identity ------------------
 (function(){
   'use strict';
 
@@ -104,7 +106,7 @@
   });
 
   // optional server events (more granular)
-  socket.on('user_join', (u)=>{ try{ markUserActive(u); renderActiveUsers(); }catch(e){}});
+  socket.on('user_join', (u)=>{ try{ markUserActive(u); renderActiveUsers(); }catch(e){} });
   socket.on('user_leave', (payload)=>{ try{ const id = (payload && (payload.userId||payload.id)) || payload; if(id) removeUser(id); renderActiveUsers(); }catch(e){} });
   socket.on('presence_update', (u)=>{ try{ markUserActive(u); renderActiveUsers(); }catch(e){} });
 
@@ -332,6 +334,56 @@
   socket.on('like', async (payload)=>{ try{ const db = await openDB(); const tx = db.transaction(STORE,'readwrite'); const store = tx.objectStore(STORE); const req = store.get(payload.postId); req.onsuccess = async ()=>{ const post = req.result; if(!post) return; post.likes = post.likes||[]; if(payload.action==='like'){ if(!post.likes.find(l=>l.id===payload.likeId||l.userId===payload.userId)) post.likes.push({id:payload.likeId,userId:payload.userId,userName:payload.userName||null,created_at:payload.created_at}); } else { post.likes = post.likes.filter(l=>l.id!==payload.likeId&&l.userId!==payload.userId); } await updatePostInDB(post); refreshPostInDOM(post.id,post); }; }catch(e){console.error(e);} });
   socket.on('comment', async (payload)=>{ try{ const db = await openDB(); const tx = db.transaction(STORE,'readwrite'); const store = tx.objectStore(STORE); const req = store.get(payload.postId); req.onsuccess = async ()=>{ const post = req.result; if(!post) return; post.comments = post.comments||[]; if(!post.comments.find(c=>c.id===payload.comment.id)){ post.comments.unshift(payload.comment); await updatePostInDB(post); refreshPostInDOM(post.id,post); } }; }catch(e){console.error(e);} });
 
+  // NEW: respond to server's request to announce local posts (metadata only)
+  socket.on('please_announce_posts', async ()=>{
+    try{
+      const posts = await getAllPostsFromDB();
+      const metaList = posts.map(p=>({ id: p.id, created_at: p.created_at, userId: p.userId, userName: p.userName, meta: { size: (p.imageData && p.imageData.length) || 0, caption: p.caption || '' }, hasBlob: !!p.imageData }));
+      socket.emit('announce_posts', metaList);
+    }catch(e){ console.error('[announce_posts] failed', e); }
+  });
+
+  // NEW: if server asks this client to upload specific posts (ids), send full posts
+  socket.on('request_upload_posts', async (ids)=>{
+    try{
+      if(!Array.isArray(ids) || ids.length===0) return;
+      for(const id of ids){
+        try{
+          const db = await openDB();
+          const tx = db.transaction(STORE,'readonly');
+          const req = tx.objectStore(STORE).get(id);
+          req.onsuccess = ()=>{
+            const post = req.result;
+            if(post){
+              // prefer 'upload_full_post' (new protocol); also emit 'new_post' for backward compatibility
+              try{ socket.emit('upload_full_post', post); }catch(_){}
+              try{ socket.emit('new_post', post); }catch(_){}
+            }
+          };
+        }catch(e){ console.error('[request_upload_posts] per-id error', e); }
+      }
+    }catch(e){ console.error('[request_upload_posts] failed', e); }
+  });
+
+  // NEW: server tells this client which server-posts the client is missing
+  socket.on('sync_needed', async (ids)=>{
+    try{
+      if(!Array.isArray(ids) || ids.length===0) return;
+      socket.emit('request_posts_by_id', ids);
+    }catch(e){ console.error('[sync_needed] failed', e); }
+  });
+
+  // NEW: server bulk-sends posts requested by this client
+  socket.on('bulk_posts', async (posts)=>{
+    try{
+      if(!Array.isArray(posts) || posts.length===0) return;
+      for(const p of posts){
+        try{ if(!(await existsInDB(p.id))) await savePostToDB(p); }catch(e){}
+        prependPostToFeed(p);
+      }
+    }catch(e){ console.error('[bulk_posts] handler failed', e); }
+  });
+
   // messages socket handlers
   socket.on('messages_sync', async (messages)=>{ // optional server support
     for(const m of messages||[]){ try{ if(!(await existsMessageInDB(m.id))) await saveMessageToDB(m); }catch(e){} }
@@ -353,7 +405,12 @@
     e.preventDefault(); const fileInput = document.getElementById('imageInput'); const caption = document.getElementById('caption').value.trim(); const file = fileInput.files && fileInput.files[0]; if(!file) return alert('Choose an image first'); if(file.size > 20*1024*1024 && !confirm('Image is large (>20MB). Continue?')) return;
     let processedDataUrl; try{ processedDataUrl = await processImageFile(file); }catch(err){ console.error('processing failed',err); processedDataUrl = await new Promise((res,rej)=>{ const fr = new FileReader(); fr.onload = ()=> res(fr.result); fr.onerror = rej; fr.readAsDataURL(file); }); }
     const post = { id:uid(), userId:currentUserId, userName:currentUser, caption, imageData:processedDataUrl, created_at:timeNow(), likes:[], comments:[] };
-    await savePostToDB(post); prependPostToFeed(post); socket.emit('new_post', post); fileInput.value=''; document.getElementById('caption').value=''; });
+    await savePostToDB(post); prependPostToFeed(post);
+    // emit using new server protocol
+    try{ socket.emit('upload_full_post', post); }catch(e){}
+    // keep backward compatibility with older servers
+    try{ socket.emit('new_post', post); }catch(e){}
+    fileInput.value=''; document.getElementById('caption').value=''; });
 
   // like/comment helpers (same as before)
   async function toggleLike(postId, btnEl){ const userId=currentUserId; const userName=currentUser; const likeId=uid(); const db=await openDB(); const tx=db.transaction(STORE,'readwrite'); const store = tx.objectStore(STORE); const req = store.get(postId); req.onsuccess = async ()=>{ const post = req.result; if(!post) return; post.likes = post.likes||[]; const existing = post.likes.find(l=>l.userId===userId); const payload = { postId, userId, userName, likeId, action:'like', created_at:timeNow() }; if(existing){ payload.action='unlike'; payload.likeId = existing.id; post.likes = post.likes.filter(l=>l.userId!==userId); btnEl.classList.remove('liked'); } else { post.likes.push({id:likeId,userId,userName,created_at:payload.created_at}); btnEl.classList.add('liked'); } const countEl = btnEl.querySelector('.like-count'); if(countEl) countEl.textContent = post.likes.length; await updatePostInDB(post); socket.emit('like', payload); }; req.onerror = (e)=> console.error(e); }

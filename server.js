@@ -29,6 +29,7 @@ const io = new Server(server, {
 
 // in-memory caches (simple, ephemeral)
 const POSTS_CACHE = [];     // recent posts, newest last
+const POSTS_BY_ID = new Map(); // quick lookup for dedupe
 const MESSAGES_CACHE = [];  // recent messages, oldest first
 
 function uid() {
@@ -38,8 +39,18 @@ function uid() {
 function nowISO(){ return new Date().toISOString(); }
 
 function pushPostToCache(post){
+  if(!post || !post.id) return;
+  if(POSTS_BY_ID.has(post.id)) return; // dedupe
   POSTS_CACHE.push(post);
-  if(POSTS_CACHE.length > POSTS_CACHE_MAX) POSTS_CACHE.splice(0, POSTS_CACHE.length - POSTS_CACHE_MAX);
+  POSTS_BY_ID.set(post.id, post);
+  if(POSTS_CACHE.length > POSTS_CACHE_MAX) {
+    // remove oldest
+    const removeCount = POSTS_CACHE.length - POSTS_CACHE_MAX;
+    for(let i=0;i<removeCount;i++){
+      const removed = POSTS_CACHE.shift();
+      if(removed && removed.id) POSTS_BY_ID.delete(removed.id);
+    }
+  }
 }
 function pushMessageToCache(msg){
   MESSAGES_CACHE.push(msg);
@@ -47,6 +58,7 @@ function pushMessageToCache(msg){
 }
 
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json({limit: '10mb'})); // allow JSON uploads for small images (dev)
 
 // ---------- Presence structures ----------
 /*
@@ -67,7 +79,6 @@ function markSocketForUser(socketId, userId, userName){
   } else {
     // update username if changed
     if(userName && userName !== entry.userName) entry.userName = userName;
-    // optional: emit presence_update to others so UI refreshes name/lastSeen
     io.emit('presence_update', { userId, userName: entry.userName, socketId });
   }
   entry.sockets.add(socketId);
@@ -146,6 +157,13 @@ io.on('connection', (socket) => {
       markSocketForUser(socket.id, payload.userId, payload.userName || payload.name);
       // optionally respond with current active list
       socket.emit('active_users', getActiveUsersArray());
+
+      // ask all connected clients to announce what posts they have so server can reconcile
+      // (this helps when clients have local-only images that server hasn't seen yet)
+      for(const [sId, s] of io.sockets.sockets){
+        // ask each socket to announce its local posts
+        try { s.emit('please_announce_posts'); } catch(e){}
+      }
     } catch(err){ console.error('[ERR] im_here', err); }
   });
 
@@ -174,8 +192,9 @@ io.on('connection', (socket) => {
     } catch(e){ console.error('[ERR] heartbeat', e); }
   });
 
-  // NEW POST (image upload)
-  socket.on('new_post', (post) => {
+  // NEW POST (client uploads full post including image data)
+  // post should include: { id, created_at, userId, userName, kind:'image', url?, blobBase64?, meta:{} }
+  socket.on('upload_full_post', (post) => {
     try {
       if(!post) return;
       if(!post.id) post.id = uid();
@@ -183,12 +202,43 @@ io.on('connection', (socket) => {
       post.likes = Array.isArray(post.likes) ? post.likes : [];
       post.comments = Array.isArray(post.comments) ? post.comments : [];
 
+      // store and broadcast
       pushPostToCache(post);
-      io.emit('post', post);
-      console.log('[RECV] new_post -> broadcast', post.id);
-    } catch(err){
-      console.error('[ERR] new_post', err);
-    }
+      io.emit('post', post); // every client should persist locally
+      console.log('[RECV] upload_full_post -> broadcast', post.id);
+    } catch(err){ console.error('[ERR] upload_full_post', err); }
+  });
+
+  // Client announces a list of posts it currently has locally (metadata only)
+  // payload: [{id, created_at, userId, meta:{thumbUrl?, size?}, hasBlob: true|false}, ...]
+  socket.on('announce_posts', (list) => {
+    try {
+      if(!Array.isArray(list)) return;
+      const missingOnServer = [];
+      const clientIds = new Set();
+      for(const item of list){
+        if(!item || !item.id) continue;
+        clientIds.add(item.id);
+        if(!POSTS_BY_ID.has(item.id)) missingOnServer.push(item.id);
+      }
+
+      // ask this socket to upload any posts the server is missing
+      if(missingOnServer.length) socket.emit('request_upload_posts', missingOnServer);
+
+      // tell client which server posts it is missing (so client can request those)
+      const needOnClient = POSTS_CACHE.filter(p => !clientIds.has(p.id)).map(p => p.id);
+      if(needOnClient.length) socket.emit('sync_needed', needOnClient);
+
+    } catch(e){ console.error('[ERR] announce_posts', e); }
+  });
+
+  // If a client requests the server to send specific posts by id
+  socket.on('request_posts_by_id', (ids) => {
+    try{
+      if(!Array.isArray(ids)) return;
+      const found = ids.map(id => POSTS_BY_ID.get(id)).filter(Boolean);
+      if(found.length) socket.emit('bulk_posts', found);
+    } catch(e){ console.error('[ERR] request_posts_by_id', e); }
   });
 
   // LIKE event (from clients)
@@ -249,6 +299,11 @@ io.on('connection', (socket) => {
       unmarkSocket(socket.id);
     } catch(e){ console.error('[ERR] disconnect handling', e); }
   });
+});
+
+// Optional HTTP helper: fetch posts JSON (helpful for clients that want to GET)
+app.get('/posts', (req, res) => {
+  res.json({ posts: POSTS_CACHE.slice() });
 });
 
 const PORT = process.env.PORT || 3000;
