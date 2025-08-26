@@ -46,10 +46,9 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
 .primary{padding:10px 14px;border-radius:999px;border:0;background:var(--accent);color:#05070f;font-weight:700;cursor:pointer}
 
 /* Feed */
-/* Support both .post and .post-card so HTML variants both work */
 #feed{margin-top:18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:var(--gap)}
-.post, .post-card{position:relative; z-index:1;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));border:1px solid rgba(255,255,255,0.03);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;transition:transform 180ms ease, box-shadow 180ms ease}
-.post:hover, .post-card:hover{transform:translateY(-6px);box-shadow:0 12px 30px rgba(2,6,23,0.6)}
+.post{position:relative; z-index:1;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));border:1px solid rgba(255,255,255,0.03);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;transition:transform 180ms ease, box-shadow 180ms ease}
+.post:hover{transform:translateY(-6px);box-shadow:0 12px 30px rgba(2,6,23,0.6)}
 .meta{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px}
 
 /* Image frame */
@@ -86,59 +85,6 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
 }
 .lightbox-canvas{width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
 #lbImg{max-width:100%;max-height:100%;object-fit:contain;touch-action:none;user-select:none;cursor:zoom-in;transition:transform 200ms cubic-bezier(.2,.9,.2,1);}
-
-/* Video styles for feed */
-.post-media, .media-wrap { display:block; width:100%; }
-.post-media img, .post-media video, .post-media .video-wrap{ width:100%; height:auto; border-radius:8px; display:block; }
-
-/* NEW: video-specific styles */
-.video-wrap{ position:relative; overflow:hidden; border-radius:8px; background:#000; display:flex; align-items:center; justify-content:center; min-height:120px; max-height:420px; }
-.post-video{ width:100%; height:auto; max-height:420px; object-fit:contain; border-radius:8px; cursor:pointer; display:block; }
-
-/* Play overlay (thumbnail) - visible on feed until opened in lightbox */
-.play-overlay{
-  position:absolute;
-  inset:0;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  pointer-events:none;
-}
-.play-overlay .play-btn{
-  pointer-events:auto;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  width:72px;
-  height:72px;
-  border-radius:999px;
-  background:linear-gradient(180deg, rgba(0,0,0,0.5), rgba(0,0,0,0.35));
-  box-shadow:0 12px 30px rgba(2,6,23,0.6);
-  border:2px solid rgba(255,255,255,0.06);
-  font-size:28px;
-  color:#fff;
-  cursor:pointer;
-  transition:transform .12s ease, box-shadow .12s ease;
-}
-.play-overlay .play-btn:active{ transform:scale(.98) }
-
-/* Small preview controls / mute indicator (optional) */
-.video-controls-mini{
-  position:absolute;
-  right:8px;
-  bottom:8px;
-  display:flex;
-  gap:8px;
-  align-items:center;
-  pointer-events:none;
-}
-.video-controls-mini .vc-item{
-  pointer-events:auto;
-  padding:6px 8px;border-radius:8px;background:rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.04);color:#fff;font-size:13px;
-}
-
-/* Lighbox video styles */
-#lbVideo{max-width:100%;max-height:100%;object-fit:contain;display:none;outline:none}
 
 /* --- UPDATED: glass-style, smaller zoom buttons --- */
 .lb-controls{position:absolute;right:14px;top:14px;display:flex;flex-direction:column;gap:10px}
@@ -453,7 +399,6 @@ body.lightbox-open .wrap,
 body.lightbox-open #feed,
 body.lightbox-open .card,
 body.lightbox-open .post,
-body.lightbox-open .post-card,
 body.lightbox-open footer,
 body.lightbox-open nav,
 body.lightbox-open aside {
@@ -503,9 +448,5 @@ body.lightbox-open #lbImg {
     transition-duration: 0.001ms !important;
   }
 }
-
-/* Small helper classes (JS can toggle) */
-.is-playing .play-overlay { display:none !important; }
-.is-paused .play-overlay { display:flex !important; }
 
 /* End of file */
