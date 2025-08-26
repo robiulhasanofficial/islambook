@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="theme-color" content="#0ea5e9" />
-  <title>IBGM</title>
+  <title>IBGM — Media (Image + Video) Support</title>
   <link rel="icon" href="/logo/logo.png" type="image/png" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -74,30 +74,32 @@
       </div>
     </header>
 
-    <section class="card upload" aria-label="Upload image">
-      <input class="file" type="file" id="imageInput" accept="image/*" />
+    <!-- Upload section now supports image and video -->
+    <section class="card upload" aria-label="Upload media">
+      <label for="mediaInput" class="file-label">Choose image or video</label>
+      <input class="file" type="file" id="mediaInput" accept="image/*,video/*" />
+      <div id="selectedPreview" class="selected-preview" aria-live="polite" style="margin-top:8px"></div>
+
       <input type="text" id="caption" placeholder="Caption (optional)" />
       <button class="primary" id="uploadBtn">Upload</button>
-      <small id="uploadNote" style="color:var(--muted)">We auto-resize for best viewing — full image always visible in viewer.</small>
+      <small id="uploadNote" style="color:var(--muted)">We auto-resize for best viewing — full media always visible in viewer.</small>
     </section>
 
     <div id="searchInfo" style="display:none;color:var(--muted);margin-top:10px"></div>
 
-    <section id="feed" aria-live="polite"></section>
+    <section id="feed" aria-live="polite" class="feed"></section>
 
     <p style="margin-top:18px;color:var(--muted)">JEHAD HASAN </p>
   </div>
 
-  <!-- Lightbox / Viewer -->
-  <div id="lightboxOverlay" class="lightbox-overlay" aria-hidden="true" role="dialog" aria-label="Image viewer">
+  <!-- Lightbox / Viewer supports image and video -->
+  <div id="lightboxOverlay" class="lightbox-overlay" aria-hidden="true" role="dialog" aria-label="Media viewer">
     <div class="lightbox-inner">
       <div class="lightbox-canvas" tabindex="0">
-        <img id="lbImg" src="" alt="" draggable="false" />
+        <img id="lbImg" src="" alt="" draggable="false" style="max-width:100%;display:none" />
+        <video id="lbVideo" controls playsinline style="max-width:100%;display:none"></video>
       </div>
       <div class="lb-controls" role="toolbar" aria-label="Viewer controls">
-        <button id="zoomIn" class="lb-btn" title="Zoom in">＋</button>
-        <button id="zoomOut" class="lb-btn" title="Zoom out">－</button>
-        <button id="resetZoom" class="lb-btn" title="Reset zoom">○</button>
         <button id="closeLBox" class="lb-btn" title="Close viewer">✕</button>
       </div>
       <div id="lbHint" class="lb-hint">Pinch • Double-tap • Drag</div>
@@ -125,7 +127,9 @@
   </div>
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js" defer></script>
-  <!-- script.js will wire up socket events, toggle behavior, and list rendering -->
-  <script src="script.js" defer></script>
+
+  <!-- Inline script: handles media preview, feed rendering, and lightbox for image+video -->
+   <script src="script.js"></script>
+ 
 </body>
 </html>
