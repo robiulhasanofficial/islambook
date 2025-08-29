@@ -9,6 +9,134 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <!-- ========================
+       LEFT: three-dot menu
+       ======================== -->
+  <div id="left-three-dot" class="left-three-dot" aria-hidden="false">
+    <button id="threeDotBtn"
+            class="three-dot-btn"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-controls="sideMenu"
+            title="মেনু খুলুন"
+            type="button">
+      <span class="dot" aria-hidden="true"></span>
+      <span class="dot" aria-hidden="true"></span>
+      <span class="dot" aria-hidden="true"></span>
+      <span class="sr-only">Open menu</span>
+    </button>
+
+    <!-- SIDE MENU PANEL -->
+    <nav id="sideMenu" class="side-menu" role="navigation" aria-label="Primary side menu" hidden>
+      <div class="sm-header">
+        <strong>Menu</strong>
+        <button id="sideMenuClose" class="sm-close" aria-label="বন্ধ করুন">✕</button>
+      </div>
+
+      <ul class="sm-list" role="menu">
+        <!-- Other menu items can go here -->
+        <li role="none">
+          <!-- Messenger launcher -->
+          <button id="openMessengerBtn"
+                  class="sm-item"
+                  role="menuitem"
+                  type="button"
+                  aria-controls="messengerPanel"
+                  aria-expanded="false">
+            💬 Messenger (প্রাইভেট)
+          </button>
+        </li>
+
+        <!-- You can add more menu items below -->
+      </ul>
+    </nav>
+  </div>
+
+  <!-- ========================
+       MESSENGER PANEL (PRIVATE)
+       ======================== -->
+  <aside id="messengerPanel" class="messenger-panel" role="dialog" aria-label="Private messenger" hidden>
+    <div class="mp-header">
+      <div><strong>Messenger</strong></div>
+      <div>
+        <button id="mpCloseBtn" class="mp-close" aria-label="বন্ধ করুন">✕</button>
+      </div>
+    </div>
+
+    <!-- Search/filter inside messenger -->
+    <div class="mp-search">
+      <input id="mpSearch" placeholder="Search person..." aria-label="Search messenger contacts" />
+    </div>
+
+    <!-- Contacts list -->
+    <div id="mpContactsWrap" class="mp-contacts-wrap" role="region" aria-label="Contacts">
+      <ul id="mpContacts" class="mp-contacts" role="list" aria-live="polite">
+        <li class="mp-empty">কোথাও কেউ নেই — রিফ্রেশ করুন</li>
+      </ul>
+    </div>
+
+    <!-- Footer actions -->
+    <div class="mp-footer">
+      <button id="mpRefreshBtn" type="button">রিফ্রেশ</button>
+    </div>
+
+    <!-- Template for a contact item -->
+    <template id="mpContactTemplate">
+      <li class="mp-item" role="listitem" data-user-id="">
+        <button class="mp-item-btn" type="button" aria-label="Open chat with user">
+          <span class="mp-avatar" aria-hidden="true"></span>
+          <span class="mp-name">User Name</span>
+          <span class="mp-online" aria-hidden="true">●</span>
+        </button>
+      </li>
+    </template>
+  </aside>
+
+  <!-- ========================
+       PRIVATE CHAT WINDOW (one per active private conversation)
+       JS will create/open instances of this panel when a contact is clicked.
+       ======================== -->
+  <div id="privateChatsContainer" class="private-chats-container" aria-live="polite">
+    <!-- Example skeleton panel (hidden). JS will clone and populate using template below -->
+    <template id="privateChatTemplate">
+      <section class="private-chat" role="dialog" aria-label="Private chat" data-peer-id="" hidden>
+        <div class="pc-header">
+          <div class="pc-title">
+            <button class="pc-back" aria-label="Back to contacts">←</button>
+            <div class="pc-peer-name">Person Name</div>
+          </div>
+          <div>
+            <button class="pc-close" aria-label="Close chat">✕</button>
+          </div>
+        </div>
+
+        <div class="pc-messages" role="log" aria-live="polite">
+          <!-- messages will be appended here -->
+          <!-- Example message template used by JS -->
+        </div>
+
+        <div class="pc-input">
+          <input class="pc-text" placeholder="Type a message..." aria-label="Type a private message" />
+          <button class="pc-send" type="button">Send</button>
+        </div>
+      </section>
+    </template>
+
+    <!-- Template for a single message bubble -->
+    <template id="privateMsgTemplate">
+      <div class="pc-msg" data-msg-id="">
+        <div class="pc-msg-meta">
+          <span class="pc-msg-sender">Me / Them</span>
+          <time class="pc-msg-time" datetime=""></time>
+        </div>
+        <div class="pc-msg-body">Message text</div>
+      </div>
+    </template>
+  </div>
+
+  <!-- ========================
+       EXISTING CONTENT (kept mostly unchanged)
+       ======================== -->
   <!-- Active Users Widget (top-left). CSS will position it fixed at top-left. -->
   <div id="active-users-widget" class="active-users-widget" role="region" aria-label="Active users" data-widget="active-users">
     <!-- Toggle button: shows count + opens/closes the users panel -->
