@@ -1,4 +1,11 @@
-// script.js — Combined app logic + Active Users widget + Private Messenger
+// script.js — Combined app logic + Active Users widget
+// UPDATED: compatibility with server-side auto-sync protocol
+// - emits `upload_full_post` (and keeps `new_post` for backward compatibility)
+// - responds to `please_announce_posts` by sending `announce_posts` (metadata)
+// - handles `request_upload_posts` by uploading missing posts via `upload_full_post`
+// - handles `sync_needed` by requesting server posts via `request_posts_by_id`
+// - processes `bulk_posts` from server (save + render)
+
 (function(){
   'use strict';
 
@@ -95,24 +102,20 @@
       activeUsers.clear();
       (list||[]).forEach(u=> markUserActive(u));
       renderActiveUsers();
-      // also refresh messenger contacts if messenger is open
-      if(document.getElementById('messengerPanel') && !document.getElementById('messengerPanel').hasAttribute('hidden')){
-        renderMessengerContacts();
-      }
     }catch(e){ console.error('[presence] active_users handler err', e); }
   });
 
   // optional server events (more granular)
-  socket.on('user_join', (u)=>{ try{ markUserActive(u); renderActiveUsers(); renderMessengerContacts(); }catch(e){} });
-  socket.on('user_leave', (payload)=>{ try{ const id = (payload && (payload.userId||payload.id)) || payload; if(id) removeUser(id); renderActiveUsers(); renderMessengerContacts(); }catch(e){} });
-  socket.on('presence_update', (u)=>{ try{ markUserActive(u); renderActiveUsers(); renderMessengerContacts(); }catch(e){} });
+  socket.on('user_join', (u)=>{ try{ markUserActive(u); renderActiveUsers(); }catch(e){} });
+  socket.on('user_leave', (payload)=>{ try{ const id = (payload && (payload.userId||payload.id)) || payload; if(id) removeUser(id); renderActiveUsers(); }catch(e){} });
+  socket.on('presence_update', (u)=>{ try{ markUserActive(u); renderActiveUsers(); }catch(e){} });
 
   // Fallback: some servers might send 'presence' or 'presence_list'
-  socket.on('presence', (p)=>{ try{ if(Array.isArray(p)){ activeUsers.clear(); p.forEach(markUserActive); } else if(p && p.userId){ markUserActive(p); } renderActiveUsers(); renderMessengerContacts(); }catch(e){} });
-  socket.on('presence_list', (arr)=>{ try{ activeUsers.clear(); (arr||[]).forEach(markUserActive); renderActiveUsers(); renderMessengerContacts(); }catch(e){} });
+  socket.on('presence', (p)=>{ try{ if(Array.isArray(p)){ activeUsers.clear(); p.forEach(markUserActive); } else if(p && p.userId){ markUserActive(p); } renderActiveUsers(); }catch(e){} });
+  socket.on('presence_list', (arr)=>{ try{ activeUsers.clear(); (arr||[]).forEach(markUserActive); renderActiveUsers(); }catch(e){} });
 
   // if server sends individual notifications named differently
-  socket.on('online', (payload)=>{ try{ if(Array.isArray(payload)){ activeUsers.clear(); payload.forEach(markUserActive); } else markUserActive(payload); renderActiveUsers(); renderMessengerContacts(); }catch(e){} });
+  socket.on('online', (payload)=>{ try{ if(Array.isArray(payload)){ activeUsers.clear(); payload.forEach(markUserActive); } else markUserActive(payload); renderActiveUsers(); }catch(e){} });
 
   // heartbeat: periodically re-announce presence so server can keep TTL
   setInterval(()=>{ if(socket && socket.connected){ socket.emit('heartbeat', { userId: currentUserId, userName: currentUser }); } }, 30000);
@@ -193,21 +196,6 @@
   async function existsMessageInDB(id){ const db = await openDB(); return new Promise((res, rej) => { const tx = db.transaction(MSTORE,'readonly'); const req = tx.objectStore(MSTORE).get(id); req.onsuccess = ()=> res(!!req.result); req.onerror = ()=> rej(req.error); }); }
   async function getAllMessagesFromDB(){ const db = await openDB(); return new Promise((res, rej) => { const tx = db.transaction(MSTORE,'readonly'); const req = tx.objectStore(MSTORE).getAll(); req.onsuccess = ()=> res(req.result.sort((a,b)=> new Date(a.created_at) - new Date(b.created_at))); req.onerror = ()=> rej(req.error); }); }
 
-  // get messages between two users (private)
-  async function getMessagesBetween(userA, userB){
-    const msgs = await getAllMessagesFromDB();
-    return msgs.filter(m=>{
-      // new private message shape: { id, fromUserId, fromUserName, toUserId, text, created_at }
-      // older global messages may use userId/userName/text and no toUserId
-      const f = m.fromUserId || m.userId;
-      const t = m.toUserId || null;
-      if(t){
-        return (f === userA && t === userB) || (f === userB && t === userA);
-      }
-      return false;
-    }).sort((a,b)=> new Date(a.created_at) - new Date(b.created_at));
-  }
-
   function uid(){ return (crypto && crypto.randomUUID) ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2,9); }
   function timeNow(){ return new Date().toISOString(); }
   function escapeHtml(s){ return (!s? '': String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[m]))); }
@@ -252,7 +240,7 @@
   }
 
   // ---------- UI: render feed with nicer cards and accessibility ----------
-  const feedEl = document.getElementById('feed'); const searchInput = document.getElementById('searchInput'); const searchBtn = document.getElementById('searchBtn'); const searchInfo = document.getElementById('searchInfo');
+  const feedEl = document.getElementById('feed'); const searchInput = document.getElementById('searchInput'); const searchBtn = document.getElementById('searchBtn'); const clearSearch = document.getElementById('clearSearch'); const searchInfo = document.getElementById('searchInfo');
 
   function renderComments(container, comments){
     container.innerHTML = '';
@@ -396,47 +384,18 @@
     }catch(e){ console.error('[bulk_posts] handler failed', e); }
   });
 
-  // messages_sync -> populate messages DB (global + private)
+  // messages socket handlers
   socket.on('messages_sync', async (messages)=>{ // optional server support
     for(const m of messages||[]){ try{ if(!(await existsMessageInDB(m.id))) await saveMessageToDB(m); }catch(e){} }
-    // if global chat panel open, reload global messages
-    if(chatPanelOpen) await loadAndRenderMessages();
-    // update messenger contacts UI
-    renderMessengerContacts();
+    // if panel open, reload messages
+    if(chatPanelOpen) loadAndRenderMessages();
   });
 
-  // 'message' handler: can be global message OR private message (server sends both on 'message')
-  socket.on('message', async (msg)=>{
+  socket.on('message', async (msg)=>{ // single new message from server
     try{
-      if(!msg || !msg.id) return;
-      // If message has toUserId => private message
-      if(msg.toUserId){
-        // ensure relevant to this user (sender or recipient)
-        if(msg.toUserId !== currentUserId && (msg.fromUserId || msg.userId) !== currentUserId) {
-          // not for us
-          return;
-        }
-        if(!(await existsMessageInDB(msg.id))){
-          // normalize shape: ensure fromUserId/fromUserName exist
-          const normalized = Object.assign({}, msg);
-          // older servers might send userId/userName fields
-          if(!normalized.fromUserId && normalized.userId) normalized.fromUserId = normalized.userId;
-          if(!normalized.fromUserName && normalized.userName) normalized.fromUserName = normalized.userName;
-          await saveMessageToDB(normalized);
-          await handleIncomingPrivateMessage(normalized);
-        } else {
-          // already have it
-          await handleIncomingPrivateMessage(msg);
-        }
-      } else {
-        // Global message (no toUserId) - existing flow
-        if(!(await existsMessageInDB(msg.id))){
-          await saveMessageToDB(msg);
-          if(chatPanelOpen) appendMessageToUI(msg); else incrementUnreadBadge();
-        }else{
-          // might still display if panel is open and not present
-          if(chatPanelOpen) appendMessageToUI(msg);
-        }
+      if(!(await existsMessageInDB(msg.id))){
+        await saveMessageToDB(msg);
+        if(chatPanelOpen) appendMessageToUI(msg); else incrementUnreadBadge();
       }
     }catch(e){ console.error(e); }
   });
@@ -461,8 +420,8 @@
   const lbOverlay = document.getElementById('lightboxOverlay'); const lbInner = document.querySelector('.lightbox-inner'); const lbCanvas = document.querySelector('.lightbox-canvas'); const lbImgEl = document.getElementById('lbImg'); const lbCaptionEl = document.getElementById('lbCaption'); const btnIn = document.getElementById('zoomIn'); const btnOut = document.getElementById('zoomOut'); const btnReset = document.getElementById('resetZoom'); const btnClose = document.getElementById('closeLBox');
 
   let viewer = { scale:1, min:1, max:4, x:0, y:0, dragging:false };
-  function openLightbox(src, caption){ lbImgEl.src = src; lbImgEl.alt = caption||''; lbCaptionEl.textContent = caption||''; viewer.scale = 1; viewer.x=0; viewer.y=0; lbImgEl.style.transform = 'translate(0px,0px) scale(1)'; lbOverlay.classList.add('open'); lbOverlay.setAttribute('aria-hidden','false'); btnClose.focus(); document.body.classList.add('lightbox-open'); }
-  function closeLightbox(){ lbOverlay.classList.remove('open'); lbOverlay.setAttribute('aria-hidden','true'); setTimeout(()=> lbImgEl.src='', 300); document.body.classList.remove('lightbox-open'); }
+  function openLightbox(src, caption){ lbImgEl.src = src; lbImgEl.alt = caption||''; lbCaptionEl.textContent = caption||''; viewer.scale = 1; viewer.x=0; viewer.y=0; lbImgEl.style.transform = 'translate(0px,0px) scale(1)'; lbOverlay.classList.add('open'); lbOverlay.setAttribute('aria-hidden','false'); btnClose.focus(); }
+  function closeLightbox(){ lbOverlay.classList.remove('open'); lbOverlay.setAttribute('aria-hidden','true'); setTimeout(()=> lbImgEl.src='', 300); }
   btnClose.addEventListener('click', closeLightbox);
 
   function applyViewer(){ lbImgEl.style.transform = `translate(${viewer.x}px, ${viewer.y}px) scale(${viewer.scale})`; }
@@ -549,255 +508,13 @@
     chatMessagesEl.innerHTML = '';
     try{
       const msgs = await getAllMessagesFromDB();
-      // only show global messages (no toUserId)
-      const globalMsgs = msgs.filter(m=>!m.toUserId);
-      globalMsgs.forEach(m=>{ appendMessageToUI(m); });
+      msgs.forEach(m=>{ appendMessageToUI(m); });
       // keep scroll bottom
       chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
     }catch(e){ console.error('load messages failed', e); chatMessagesEl.innerHTML = "<div style='opacity:0.75'>Unable to load messages</div>"; }
   }
 
-  // ---------- Private messenger UI + logic ----------
-  const openMessengerBtn = document.getElementById('openMessengerBtn');
-  const messengerPanel = document.getElementById('messengerPanel');
-  const mpCloseBtn = document.getElementById('mpCloseBtn');
-  const mpContacts = document.getElementById('mpContacts');
-  const mpContactTemplate = document.getElementById('mpContactTemplate');
-  const mpSearch = document.getElementById('mpSearch');
-  const mpRefreshBtn = document.getElementById('mpRefreshBtn');
-  const privateChatsContainer = document.getElementById('privateChatsContainer');
-  const privateChatTemplate = document.getElementById('privateChatTemplate');
-  const privateMsgTemplate = document.getElementById('privateMsgTemplate');
-
-  // state: open chats map peerId -> chatElement
-  const openPrivateChats = new Map(); // peerId -> {el, inputEl, messagesEl, unread}
-
-  // open/close messenger panel
-  function openMessengerPanel(){ messengerPanel.removeAttribute('hidden'); messengerPanel.setAttribute('aria-hidden','false'); document.getElementById('mpSearch').focus(); renderMessengerContacts(); }
-  function closeMessengerPanel(){ messengerPanel.setAttribute('hidden',''); messengerPanel.setAttribute('aria-hidden','true'); }
-  openMessengerBtn && openMessengerBtn.addEventListener('click', ()=>{ openMessengerPanel(); });
-  mpCloseBtn && mpCloseBtn.addEventListener('click', ()=>{ closeMessengerPanel(); });
-
-  mpRefreshBtn && mpRefreshBtn.addEventListener('click', async ()=>{
-    socket.emit('request_active_users');
-    mpRefreshBtn.textContent = '...';
-    setTimeout(()=> mpRefreshBtn.textContent = 'রিফ্রেশ', 700);
-    await renderMessengerContacts();
-  });
-
-  // get known contacts: merge activeUsers + participants from past private messages
-  async function getKnownContacts(){
-    const map = new Map(); // id -> { userId, userName, online, lastSeen }
-    // from activeUsers
-    for(const [uid, u] of activeUsers.entries()){
-      if(uid === currentUserId) continue;
-      map.set(uid, { userId: uid, userName: u.userName || uid, online: true, lastSeen: u.lastSeen || Date.now() });
-    }
-    // from past messages
-    try{
-      const msgs = await getAllMessagesFromDB();
-      msgs.forEach(m=>{
-        const f = m.fromUserId || m.userId;
-        const t = m.toUserId || null;
-        if(t){
-          if(f && f !== currentUserId){
-            if(!map.has(f)) map.set(f, { userId: f, userName: m.fromUserName || m.fromUser || f, online: false, lastSeen: m.created_at ? new Date(m.created_at).getTime() : 0 });
-          }
-          if(t && t !== currentUserId){
-            if(!map.has(t)) map.set(t, { userId: t, userName: m.toUserName || t, online: false, lastSeen: m.created_at ? new Date(m.created_at).getTime() : 0 });
-          }
-        }
-      });
-    }catch(e){ console.warn('getKnownContacts failed', e); }
-    // return sorted (online first, then lastSeen desc)
-    return Array.from(map.values()).sort((a,b)=> {
-      if(a.online && !b.online) return -1;
-      if(!a.online && b.online) return 1;
-      return (b.lastSeen||0) - (a.lastSeen||0);
-    });
-  }
-
-  // render messenger contacts
-  async function renderMessengerContacts(filter=''){
-    mpContacts.innerHTML = '';
-    const list = await getKnownContacts();
-    const q = (filter||'').toLowerCase();
-    const filtered = list.filter(c => !q || (c.userName||'').toLowerCase().includes(q) || (c.userId||'').toLowerCase().includes(q));
-    if(filtered.length === 0){
-      const li = document.createElement('li'); li.className = 'mp-empty'; li.textContent = 'কোনো contact নাই'; mpContacts.appendChild(li); return;
-    }
-    filtered.forEach(c=>{
-      const node = mpContactTemplate.content.cloneNode(true);
-      const li = node.querySelector('.mp-item');
-      const btn = li.querySelector('.mp-item-btn');
-      const nameEl = li.querySelector('.mp-name');
-      const avatar = li.querySelector('.mp-avatar');
-      const onlineDot = li.querySelector('.mp-online');
-      li.dataset.userId = c.userId;
-      btn.dataset.userId = c.userId;
-      nameEl.textContent = c.userName || c.userId;
-      if(c.online) onlineDot.style.display = 'inline';
-      else onlineDot.style.display = 'none';
-      // unread badge placeholder
-      const unreadSpan = document.createElement('span');
-      unreadSpan.className = 'mp-unread';
-      unreadSpan.style.marginLeft = '8px';
-      unreadSpan.style.fontSize = '12px';
-      unreadSpan.style.color = 'var(--muted)';
-      unreadSpan.textContent = '';
-      btn.appendChild(unreadSpan);
-
-      btn.addEventListener('click', async (ev)=>{
-        const peerId = btn.dataset.userId;
-        const peerName = nameEl.textContent || peerId;
-        await openPrivateChat(peerId, peerName);
-        // clear unread mark on open
-        unreadSpan.textContent = '';
-      });
-
-      mpContacts.appendChild(li);
-    });
-  }
-
-  mpSearch && mpSearch.addEventListener('input', (e)=>{ renderMessengerContacts(e.target.value.trim()); });
-
-  // open private chat panel for a peer
-  async function openPrivateChat(peerId, peerName){
-    if(openPrivateChats.has(peerId)){
-      const existing = openPrivateChats.get(peerId);
-      // bring to front / focus input
-      existing.el.style.display = 'flex';
-      existing.inputEl.focus();
-      return existing;
-    }
-    // create chat element from template
-    const temp = privateChatTemplate.content.cloneNode(true);
-    const section = temp.querySelector('.private-chat');
-    section.removeAttribute('hidden');
-    section.dataset.peerId = peerId;
-
-    // fill header name
-    const titleEl = section.querySelector('.pc-peer-name');
-    if(titleEl) titleEl.textContent = peerName || peerId;
-
-    // back button (closes chat but keeps it in DOM)
-    const backBtn = section.querySelector('.pc-back');
-    backBtn && backBtn.addEventListener('click', ()=>{ section.style.display = 'none'; });
-
-    const closeBtn = section.querySelector('.pc-close');
-    closeBtn && closeBtn.addEventListener('click', ()=> {
-      section.remove();
-      openPrivateChats.delete(peerId);
-    });
-
-    const messagesWrap = section.querySelector('.pc-messages');
-    const inputEl = section.querySelector('.pc-text');
-    const sendBtn = section.querySelector('.pc-send');
-
-    // append to container
-    privateChatsContainer.appendChild(section);
-    section.style.display = 'flex';
-    // keep reference
-    openPrivateChats.set(peerId, { el: section, inputEl, messagesEl: messagesWrap, sendBtn, unread: 0 });
-
-    // load past messages between currentUserId and peerId
-    const msgs = await getMessagesBetween(currentUserId, peerId);
-    if(msgs.length === 0){
-      const blank = document.createElement('div'); blank.className = 'pc-empty'; blank.textContent = 'কোনো মেসেজ নেই — মেসেজ পাঠাও'; messagesWrap.appendChild(blank);
-    } else {
-      msgs.forEach(m => appendPrivateMessageToUI(m, section));
-    }
-    // focus input
-    inputEl.focus();
-
-    // send handler
-    sendBtn.addEventListener('click', async ()=>{
-      const txt = inputEl.value.trim();
-      if(!txt) return;
-      const msg = {
-        id: uid(),
-        fromUserId: currentUserId,
-        fromUserName: currentUser,
-        toUserId: peerId,
-        text: txt,
-        created_at: timeNow()
-      };
-      try{
-        await saveMessageToDB(msg);
-        appendPrivateMessageToUI(msg, section);
-        inputEl.value = '';
-        // emit private message to server (server will route to recipient)
-        socket.emit('private_message', msg);
-      }catch(e){ console.error('private send failed', e); alert('Message failed to send'); }
-    });
-
-    // Enter key in input
-    inputEl.addEventListener('keydown', (e)=>{ if(e.key === 'Enter'){ e.preventDefault(); sendBtn.click(); } });
-
-    return openPrivateChats.get(peerId);
-  }
-
-  // append private message to a chat UI (section DOM)
-  function appendPrivateMessageToUI(msg, sectionEl){
-    if(!sectionEl) return;
-    const messagesWrap = sectionEl.querySelector('.pc-messages');
-    if(!messagesWrap) return;
-    // remove empty placeholder if exists
-    const empty = messagesWrap.querySelector('.pc-empty');
-    if(empty) empty.remove();
-    const node = privateMsgTemplate.content.cloneNode(true);
-    const el = node.querySelector('.pc-msg');
-    el.dataset.msgId = msg.id;
-    // determine sender label
-    const sender = msg.fromUserName || msg.from || msg.userName || (msg.fromUserId || msg.userId);
-    const timeStr = new Date(msg.created_at).toLocaleTimeString();
-    const meta = el.querySelector('.pc-msg-meta');
-    if(meta){
-      const senderSpan = meta.querySelector('.pc-msg-sender');
-      const timeEl = meta.querySelector('.pc-msg-time');
-      if(senderSpan) senderSpan.textContent = sender;
-      if(timeEl) timeEl.textContent = timeStr;
-    }
-    const body = el.querySelector('.pc-msg-body');
-    if(body) body.textContent = msg.text;
-    // mark as me
-    if(msg.fromUserId === currentUserId || msg.userId === currentUserId){
-      el.classList.add('me');
-    }
-    messagesWrap.appendChild(el);
-    // scroll to bottom
-    messagesWrap.scrollTop = messagesWrap.scrollHeight;
-  }
-
-  // handle incoming private message: add to relevant chat or mark unread
-  async function handleIncomingPrivateMessage(msg){
-    // ensure normalization
-    const peerId = (msg.fromUserId === currentUserId) ? msg.toUserId : msg.fromUserId;
-    if(!peerId) return;
-    if(openPrivateChats.has(msg.fromUserId === currentUserId ? msg.toUserId : msg.fromUserId)){
-      const chat = openPrivateChats.get(peerId);
-      appendPrivateMessageToUI(msg, chat.el);
-    } else {
-      // mark unread on contacts list
-      const listItems = Array.from(document.querySelectorAll('.mp-item-btn'));
-      const btn = listItems.find(b => b.dataset && b.dataset.userId === peerId);
-      if(btn){
-        const unreadSpan = btn.querySelector('.mp-unread');
-        if(unreadSpan){
-          const cur = parseInt(unreadSpan.textContent||'0',10) || 0;
-          unreadSpan.textContent = String(cur + 1);
-        } else {
-          const s = document.createElement('span'); s.className='mp-unread'; s.textContent = '1'; btn.appendChild(s);
-        }
-      } else {
-        // if not in list, optionally show browser notification or add temporary entry
-        // For now, we'll re-render contacts so it shows in list (if known)
-        renderMessengerContacts();
-      }
-    }
-  }
-
-  // ---------- helper for incoming messages (global handled earlier) ----------
+  // called when we receive a message and panel is closed
   function handleIncomingMessage(msg){
     if(chatPanelOpen){
       appendMessageToUI(msg);
@@ -806,21 +523,23 @@
     }
   }
 
-  // ---------- Private message send from other UI (optional) ----------
-  // If you want to programmatically open chat with X: call openPrivateChat('User#abc','Name')
+  // helper for server-driven sync
+  async function loadAndRenderMessagesIfOpen(){
+    if(chatPanelOpen) await loadAndRenderMessages();
+  }
+
+  // ---------- Socket: request messages on connect (already emitted above) ----------
+  // 'message' event handled earlier: it saves and appends/increments unread.
+  // For safety, also handle local saves to show messages immediately when user sends.
 
   // ---------- Initial load ----------
-  (async ()=>{
-    await openDB();
-    await loadAndRenderFeed();
+  (async ()=>{ await openDB(); await loadAndRenderFeed(); // preload messages count for badge
     try{
       const msgs = await getAllMessagesFromDB();
-      // unread default 0
+      // set unread to zero initially (you could compute unread by timestamp if you want)
       unreadCount = 0;
       showUnreadBadge();
     }catch(e){ console.warn('messages preload failed', e); }
-    // render messenger contacts if panel visible
-    if(messengerPanel && !messengerPanel.hasAttribute('hidden')) await renderMessengerContacts();
   })();
 
 })();
