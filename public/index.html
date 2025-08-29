@@ -13,6 +13,9 @@
        Your server or initial JS should set its value so the UI can use it. -->
   <input type="hidden" id="currentUserId" value="" />
 
+  <!-- Totals bar (center-top): shows total likes and total posts for the current user. -->
+  
+
   <!-- Active Users Widget (top-left). CSS will position it fixed at top-left. -->
   <div id="active-users-widget" class="active-users-widget" role="region" aria-label="Active users" data-widget="active-users">
     <button
@@ -60,13 +63,31 @@
 
   <!-- Three-dot menu (left side) -->
   <div id="three-dot-container" class="three-dot-container" aria-hidden="false">
+    
     <button id="threeDotToggle" class="three-dot-btn" aria-haspopup="true" aria-expanded="false" aria-controls="threeDotDropdown" title="More">
       ⋯
     </button>
 
+
     <div id="threeDotDropdown" class="three-dot-dropdown" role="menu" hidden aria-hidden="true">
+
       <button id="open-private-messenger" class="three-dot-item" role="menuitem" type="button">Messenger (Private)</button>
       <button id="open-group-messages" class="three-dot-item" role="menuitem" type="button">Group Messages</button>
+      <div class="totals-bar" role="region" aria-label="মোট লাইক ও পোস্ট" data-likes-threshold="20">
+    <div class="totals-inner">
+      <div class="total-block total-likes" title="মোট লাইক">
+        <div class="total-value" id="totalLikes">0</div>
+        <div class="total-label">মোট লাইক</div>
+      </div>
+
+      <div class="totals-divider" aria-hidden="true">·</div>
+
+      <div class="total-block total-posts" title="মোট পোস্ট">
+        <div class="total-value" id="totalPosts">0</div>
+        <div class="total-label">মোট পোস্ট</div>
+      </div>
+    </div>
+  </div>
     </div>
   </div>
 

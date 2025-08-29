@@ -222,7 +222,7 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
 .au-dot{width:12px;height:12px;border-radius:999px;display:inline-block;box-shadow:0 0 0 4px rgba(0,0,0,0.12) inset;background: radial-gradient(circle at 30% 30%, #fff 8%, transparent 9%), linear-gradient(90deg,var(--c1),var(--c2));transition:transform .18s ease}
 .au-count{display:inline-flex;min-width:38px;padding:6px 12px;border-radius:999px;font-weight:800;font-variant-numeric:tabular-nums;align-items:center;justify-content:center;color:#fffefb;background:linear-gradient(90deg,var(--c1),var(--c2),var(--c3),var(--c4));background-size:200% 200%;animation:au-gradient-shift 4s linear infinite;box-shadow:0 6px 18px rgba(124,58,237,0.12);border:1px solid rgba(255,255,255,0.06);font-size:13px}
 .au-label{font-weight:700;font-size:13px;color:var(--muted);white-space:nowrap}
-#active-users-list.au-list{position:absolute;top:calc(100% + 12px);right:0;width:var(--au-panel-width);max-width: min(92vw, var(--au-panel-width));background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.04);border-radius:12px;padding:10px;box-shadow:0 18px 50px rgba(2,6,23,0.6);transform-origin: top right;transition:opacity .18s ease, transform .18s ease;color:var(--text)}
+#active-users-list.au-list{position:absolute;top:calc(100% + 12px);right:0;width:var(--au-panel-width);max-width: min(92vw, var(--au-panel-width));background:var(--pm-surface);border:1px solid rgba(255,255,255,0.04);border-radius:12px;padding:10px;box-shadow:0 18px 50px rgba(2,6,23,0.6);transform-origin: top right;transition:opacity .18s ease, transform .18s ease;color:var(--text)}
 #active-users-list[hidden]{opacity:0;transform:translateY(-6px) scale(.995);pointer-events:none;height:auto;display:block}
 #active-users-list:not([hidden]){opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
 .au-list-header{display:flex;align-items:center;justify-content:space-between;padding:6px 4px;border-bottom:1px solid rgba(255,255,255,0.02);margin-bottom:8px}
@@ -490,7 +490,7 @@ body.lightbox-open #lbImg {
   justify-content:center;
   font-size:22px;
   line-height:1;
-  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  background: linear-gradient(180deg, rgba(237, 237, 237, 0.939), rgba(255,255,255,0.01));
   border:1px solid rgba(255,255,255,0.04);
   color:var(--text);
   cursor:pointer;
@@ -513,7 +513,7 @@ body.lightbox-open #lbImg {
   display:flex;
   flex-direction:column;
   gap:6px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  background:var(--pm-surface);
   border:1px solid rgba(255,255,255,0.04);
   box-shadow: 0 18px 50px rgba(2,6,23,0.6);
   transform-origin: top left;
@@ -1033,3 +1033,78 @@ body:has(.private-messenger-panel:not([hidden])) .three-dot-dropdown{
 .pm-user-btn .pm-user-id { max-width: calc(100% - 10px); }
 
 /* End additions */
+
+/* =====================================================
+   NEW: TOTALS BAR (total likes & posts) — styles + golden state
+   This section styles the centered totals bar added in index.html
+   JS should toggle the .golden class on the .total-likes element when
+   totalLikes >= threshold (default threshold stored on the #totalsBar dataset).
+   Example in JS: if (totalLikes >= threshold) likesEl.classList.add('golden');
+===================================================== */
+
+#totalsBar{
+  position:fixed;
+  top:18px;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:10075;
+  pointer-events:none; /* outer container non-interactive — inner elements can be interactive */
+  width:auto;
+  max-width:90vw;
+}
+#totalsBar .totals-inner{
+  pointer-events:auto; /* allow clicks on inner pill if needed */
+  display:inline-flex;
+  align-items:center;
+  gap:12px;
+  background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border:1px solid rgba(255,255,255,0.04);
+  padding:8px 14px;
+  border-radius:999px;
+  color:var(--text);
+  box-shadow:0 10px 30px rgba(2,6,23,0.45);
+  backdrop-filter: blur(6px);
+}
+.total-block{display:flex;flex-direction:column;align-items:center;min-width:64px}
+.total-value{font-weight:900;font-size:16px;line-height:1}
+.total-label{font-size:12px;color:var(--muted);margin-top:4px}
+.totals-divider{color:var(--muted);font-weight:800}
+
+/* default look for likes — subtle gradient */
+.total-likes .total-value{color:linear-gradient(90deg,var(--c4),#ffd07a); /* fallback if browser ignores gradient as color */}
+
+/* GOLDEN state when threshold reached */
+.total-likes.golden .total-value{
+  color:#522a00; /* dark base to sit on golden background */
+  background: linear-gradient(90deg,#ffd54a,#f59e0b);
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-fill-color: transparent;
+  -webkit-text-fill-color: transparent;
+  box-shadow: 0 6px 22px rgba(245,158,11,0.12);
+}
+
+/* add a small star/glow icon when golden (via pseudo-element) */
+.total-likes.golden::after{
+  content:'★';
+  margin-left:8px;
+  font-size:14px;
+  color:#ffd54a;
+  text-shadow:0 6px 18px rgba(245,158,11,0.18);
+}
+
+/* slightly reduce top offset on mobile so it doesn't collide with header actions */
+@media (max-width:768px){
+  #totalsBar{ top:12px }
+  #totalsBar .totals-inner{ padding:8px 10px }
+  .total-value{ font-size:15px }
+}
+
+/* on very narrow screens, keep totals compact and wrap label under the value */
+@media (max-width:420px){
+  .totals-inner{ gap:8px }
+  .total-block{ min-width:54px }
+  .total-label{ font-size:11px }
+}
+
+/* End totals bar styles */
