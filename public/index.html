@@ -9,9 +9,12 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <!-- Hidden holder for the current logged-in user's ID.
+       Your server or initial JS should set its value so the UI can use it. -->
+  <input type="hidden" id="currentUserId" value="" />
+
   <!-- Active Users Widget (top-left). CSS will position it fixed at top-left. -->
   <div id="active-users-widget" class="active-users-widget" role="region" aria-label="Active users" data-widget="active-users">
-    <!-- Toggle button: shows count + opens/closes the users panel -->
     <button
       id="active-users-toggle"
       class="au-toggle"
@@ -25,14 +28,14 @@
       <span class="au-label">অনলাইন</span>
     </button>
 
-    <!-- Panel with list of users. Hidden by default; toggled by JS. -->
     <div id="active-users-list" class="au-list" hidden aria-hidden="true" role="dialog" aria-label="Online users list">
       <div class="au-list-header">
         <strong>অনলাইন ব্যবহারকারী</strong>
         <button id="au-list-close" class="au-close" aria-label="লিস্ট বন্ধ" title="বন্ধ করুন">×</button>
       </div>
 
-      <!-- Template for a single user row (name + id). JS will clone this. -->
+      <!-- Template for a single user row (name + id). JS will clone this.
+           Note: data-user-id attribute must be set by JS when rendering. -->
       <template id="au-item-template">
         <li class="au-item" role="listitem" data-user-id="">
           <span class="au-item-name" aria-hidden="false">User name</span>
@@ -44,34 +47,28 @@
         <li class="au-empty">কেউ অনলাইন নেই</li>
       </ul>
 
-      <!-- Optional footer area for actions (copy list, refresh, etc.) -->
       <div class="au-list-footer">
         <button id="au-copy-list" class="au-action" type="button" title="অনলাইনদের নাম/আইডি কপি করুন">কপি</button>
         <button id="au-refresh" class="au-action" type="button" title="রিফ্রেশ">রিফ্রেশ</button>
       </div>
     </div>
 
-    <!-- Fallback for users with JS disabled -->
     <noscript>
       <div class="au-noscript">জাভাস্ক্রিপ্ট চালু করুন — অনলাইন কাউন্ট দেখার জন্য প্রয়োজন।</div>
     </noscript>
   </div>
 
-  <!-- ========== NEW: Three-dot menu (left side) ========== -->
-  <!-- টিপলে ড্রপডাউন খোলা যাবে; ড্রপডাউনে "Messenger" অপশন আছে যা প্রাইভেট মেসেঞ্জার খুলবে -->
+  <!-- Three-dot menu (left side) -->
   <div id="three-dot-container" class="three-dot-container" aria-hidden="false">
     <button id="threeDotToggle" class="three-dot-btn" aria-haspopup="true" aria-expanded="false" aria-controls="threeDotDropdown" title="More">
       ⋯
     </button>
 
     <div id="threeDotDropdown" class="three-dot-dropdown" role="menu" hidden aria-hidden="true">
-      <!-- অন্য মেনু আইটেম যোগ করা যাবে -->
       <button id="open-private-messenger" class="three-dot-item" role="menuitem" type="button">Messenger (Private)</button>
       <button id="open-group-messages" class="three-dot-item" role="menuitem" type="button">Group Messages</button>
-      <!-- Add more actions here if needed -->
     </div>
   </div>
-  <!-- ========== end three-dot ========== -->
 
   <div class="wrap">
     <header class="app">
@@ -86,7 +83,10 @@
           <button id="searchBtn" aria-label="Search">Search</button>
         </div>
 
-        <div class="id-badge" id="idBadge" title="Click to copy your ID">You: —</div>
+        <!-- ID badge: JS should fill in the user id and optionally set data-current-user-id -->
+        <div class="id-badge" id="idBadge" title="Click to copy your ID" role="button" aria-pressed="false">
+          You: —
+        </div>
       </div>
     </header>
 
@@ -140,7 +140,7 @@
     </div>
   </div>
 
-  <!-- ========== NEW: Private Messenger Panel (opened from three-dot -> Messenger) ========== -->
+  <!-- Private Messenger Panel -->
   <aside id="privateMessengerPanel" class="private-messenger-panel" role="dialog" aria-label="Private messenger" aria-hidden="true" hidden>
     <header class="pm-header">
       <div class="pm-title">Messenger</div>
@@ -157,10 +157,13 @@
           <button id="pmRefresh" class="pm-refresh" title="Refresh contacts">↻</button>
         </div>
 
+        <!-- Template: IMPORTANT: data-user-id must be set by JS when creating items.
+             The .pm-user-id span shows the ID next to the name. -->
         <template id="pm-user-template">
           <li class="pm-user-item" data-user-id="">
             <button class="pm-user-btn" type="button" aria-label="Open chat with user">
               <span class="pm-user-name">Name</span>
+              <span class="pm-user-id" aria-label="User ID">#123</span>
               <span class="pm-user-status" aria-hidden="true">●</span>
             </button>
           </li>
@@ -189,7 +192,6 @@
       </section>
     </div>
   </aside>
-  <!-- ========== end private messenger ========== -->
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js" defer></script>
   <!-- script.js will wire up socket events, toggle behavior, and list rendering -->

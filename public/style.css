@@ -1,3 +1,12 @@
+/* IBGM — full stylesheet
+   File: ibgm-style.css
+   Includes: main UI, active-users widget, lightbox, chat, three-dot menu,
+   private messenger (horizontal contacts on top), responsive rules, and
+   additional overrides (ID visibility + send-guard).
+
+   Replace your existing style.css with this file or merge as needed.
+*/
+
 :root{
   --c1:#7c3aed;
   --c2:#0ea5e9;
@@ -91,7 +100,7 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
   box-sizing:border-box;
 }
 .lightbox-canvas{width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
-#lbImg{max-width:100%;max-height:100%;object-fit:contain;touch-action:none;user-select:none;cursor:zoom-in;transition:transform 200ms cubic-bezier(.2,.9,.2,1);}
+#lbImg{max-width:100%;max-height:100%;object-fit:contain;touch-action:none;user-select:none;cursor:zoom-in;transition:transform 200ms cubic-bezier(.2,.9,.2,1);} 
 
 /* --- UPDATED: glass-style, smaller zoom buttons --- */
 .lb-controls{position:absolute;right:14px;top:14px;display:flex;flex-direction:column;gap:10px}
@@ -173,7 +182,7 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
 .chat-panel{position:fixed; right:18px; bottom:86px; width:320px; max-width:92vw; height:420px; z-index:10055;background:linear-gradient(180deg, rgba(8,12,20,0.95), rgba(4,6,10,0.95)); border:1px solid rgba(255,255,255,0.04);border-radius:12px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 40px rgba(2,6,23,0.7)}
 .chat-header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.02); font-weight:700; color:var(--muted)}
 .chat-messages{flex:1;padding:10px; overflow:auto; display:flex; flex-direction:column; gap:8px; }
-.chat-msg{background:rgba(255,255,255,0.02);padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.02); font-size:13px; color:var(--muted);}
+.chat-msg{background:rgba(255,255,255,0.02);padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.02); font-size:13px; color:var(--muted);} 
 .chat-msg strong{color:var(--text); display:block; font-size:12px;}
 .chat-input{display:flex; gap:8px; padding:10px; border-top:1px solid rgba(255,255,255,0.01);} 
 .chat-input input{flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.01);color:var(--text)}
@@ -576,7 +585,8 @@ body.lightbox-open #lbImg {
 
 /* ===========================
    KEY CHANGE: Contacts now SHOW ON TOP (horizontal)
-   =========================== */
+   ===========================
+*/
 
 /* body layout: contacts on TOP (row) + chat area below (column) */
 .pm-body{
@@ -615,7 +625,10 @@ body.lightbox-open #lbImg {
 .pm-refresh{border:0;background:transparent;color:var(--pm-muted);cursor:pointer;padding:6px;border-radius:8px}
 .pm-refresh:hover{ color:var(--pm-text); background:transparent }
 
-/* user list: show as inline horizontal list */
+/* ========== UPDATED BLOCK: user list (horizontal) ==========
+   Replaced previous overflow:hidden with horizontal scroll support.
+   This ensures many contacts are visible via scrolling.
+============================================================= */
 .pm-user-list{
   list-style:none;
   margin:0;
@@ -624,8 +637,21 @@ body.lightbox-open #lbImg {
   flex-direction:row; /* horizontal items */
   gap:8px;
   align-items:center;
-  overflow:hidden;
+
+  /* allow horizontal scrolling when many contacts */
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch; /* smooth native momentum scrolling on iOS */
+  scroll-behavior: smooth;           /* smooth when programmatically scrolled */
+
+  /* keep content from wrapping */
+  white-space: nowrap;
 }
+
+/* horizontal scrollbar styling for modern browsers */
+.pm-user-list::-webkit-scrollbar{ height:10px; }
+.pm-user-list::-webkit-scrollbar-thumb{ background:rgba(2,6,23,0.08); border-radius:999px; }
+.pm-user-list::-webkit-scrollbar-track{ background:transparent; }
 
 /* each item adjusted for horizontal layout */
 .pm-user-item{
@@ -917,3 +943,93 @@ body:has(.private-messenger-panel:not([hidden])) .three-dot-dropdown{
 }
 
 /* End CSS */
+
+/* ============================
+   ADDITIONAL UPDATES — CONTACT ID VISIBILITY + SEND GUARD
+   ============================ */
+
+/* Show ID clearly next to name in PM contact "card" */
+.pm-user-btn { 
+  /* default: column (avatar over name). We'll adapt at larger widths below) */
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+/* style the id chip for PM contacts */
+.pm-user-id {
+  display: block;
+  font-size: 12px;
+  color: var(--pm-muted);
+  background: transparent;
+  padding: 2px 6px;
+  border-radius: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* On wider screens show name + id inline for compact visibility */
+@media (min-width: 720px) {
+  .pm-user-btn {
+    flex-direction: row;        /* name and id on same row */
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+    min-width: 140px;
+  }
+  .pm-user-name{
+    font-size:13px;
+    font-weight:800;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pm-user-id{ font-size:12px; color:var(--pm-muted); margin-left:4px; flex-shrink:0; }
+}
+
+/* Ensure active-users rows keep id visible and truncated nicely */
+.au-item { gap: 8px; align-items: center; }
+.au-item-id { font-size:12px; color:var(--muted); flex-shrink:0; }
+
+/* Highlight currently-logged-in user in contacts (optional: JS can set data-current="true") */
+.pm-user-item[data-current="true"] .pm-user-btn,
+.au-item[data-current="true"] {
+  box-shadow: 0 8px 20px rgba(124,58,237,0.08);
+  border-color: rgba(124,58,237,0.14);
+}
+
+/* ======= Prevent rapid double-click / multiple-send visual guard ====== */
+/* When JS marks the form as sending (add class .sending), visually disable inputs */
+.pm-chat-form.sending input,
+.pm-chat-form.sending button {
+  pointer-events: none;
+  opacity: 0.6;
+  filter: saturate(0.96);
+}
+
+/* Also disable send button when actually disabled (for accessibility) */
+.pm-chat-form button[disabled] {
+  pointer-events: none;
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Small UX: show a small "sending…" indicator if needed (JS can inject) */
+.pm-sending-indicator {
+  font-size:12px;
+  color:var(--pm-muted);
+  margin-left:8px;
+  display:inline-block;
+}
+
+/* Focus / keyboard friendliness for the new id chip (so screen-reader users can reach it) */
+.pm-user-id:focus { outline: 2px solid rgba(14,165,233,0.16); outline-offset: 3px; border-radius:6px }
+
+/* Slight spacing polish for horizontal contact list to ensure ID doesn't wrap awkwardly */
+.pm-user-btn .pm-user-name,
+.pm-user-btn .pm-user-id { max-width: calc(100% - 10px); }
+
+/* End additions */
