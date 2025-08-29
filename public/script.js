@@ -1,11 +1,4 @@
-// script.js — Combined app logic + Active Users widget
-// UPDATED: compatibility with server-side auto-sync protocol
-// - emits `upload_full_post` (and keeps `new_post` for backward compatibility)
-// - responds to `please_announce_posts` by sending `announce_posts` (metadata)
-// - handles `request_upload_posts` by uploading missing posts via `upload_full_post`
-// - handles `sync_needed` by requesting server posts via `request_posts_by_id`
-// - processes `bulk_posts` from server (save + render)
-
+// script.js — Combined app logic + Active Users widget + Three-dot + Private Messenger
 (function(){
   'use strict';
 
@@ -23,6 +16,8 @@
     // announce presence to server
     socket.emit('im_here', { userId: currentUserId, userName: currentUser });
     socket.emit('request_active_users');
+    // optional request for contacts (server may respond with 'contacts')
+    try{ socket.emit('request_contacts'); }catch(_){}
   });
 
   // ------------------ Active Users widget (NEW) ------------------
@@ -38,7 +33,6 @@
 
   // Internal state
   const activeUsers = new Map(); // userId -> {userId, userName, lastSeen, socketId}
-
   function setActiveCount(n){ auCountEl.textContent = String(n || 0); auToggle.setAttribute('aria-expanded', String(Boolean(auListPanel && !auListPanel.hasAttribute('hidden')))); }
 
   function renderActiveUsers(){
@@ -57,7 +51,7 @@
       nameEl.textContent = u.userName || 'Anonymous';
       idEl.textContent = u.userId;
       // clicking a user copies their id
-      li.addEventListener('click', async ()=>{
+      li.addEventListener('click', async ()=> {
         try{ await navigator.clipboard.writeText(u.userId); // small UI feedback
           const old = idEl.textContent;
           idEl.textContent = 'Copied!';
@@ -79,7 +73,7 @@
   auCloseBtn.addEventListener('click', (e)=>{ e.stopPropagation(); closeAuPanel(); });
 
   // copy list
-  auCopyBtn.addEventListener('click', async ()=>{
+  auCopyBtn.addEventListener('click', async ()=> {
     if(activeUsers.size===0) return alert('No active users to copy');
     const lines = Array.from(activeUsers.values()).map(u=>`${u.userName||'Anon'} \t ${u.userId}`);
     const payload = lines.join('\n');
@@ -97,7 +91,7 @@
   function removeUser(userId){ activeUsers.delete(userId); }
 
   // handle a bulk list from server
-  socket.on('active_users', (list)=>{
+  socket.on('active_users', (list)=> {
     try{
       activeUsers.clear();
       (list||[]).forEach(u=> markUserActive(u));
@@ -335,7 +329,7 @@
   socket.on('comment', async (payload)=>{ try{ const db = await openDB(); const tx = db.transaction(STORE,'readwrite'); const store = tx.objectStore(STORE); const req = store.get(payload.postId); req.onsuccess = async ()=>{ const post = req.result; if(!post) return; post.comments = post.comments||[]; if(!post.comments.find(c=>c.id===payload.comment.id)){ post.comments.unshift(payload.comment); await updatePostInDB(post); refreshPostInDOM(post.id,post); } }; }catch(e){console.error(e);} });
 
   // NEW: respond to server's request to announce local posts (metadata only)
-  socket.on('please_announce_posts', async ()=>{
+  socket.on('please_announce_posts', async ()=> {
     try{
       const posts = await getAllPostsFromDB();
       const metaList = posts.map(p=>({ id: p.id, created_at: p.created_at, userId: p.userId, userName: p.userName, meta: { size: (p.imageData && p.imageData.length) || 0, caption: p.caption || '' }, hasBlob: !!p.imageData }));
@@ -344,7 +338,7 @@
   });
 
   // NEW: if server asks this client to upload specific posts (ids), send full posts
-  socket.on('request_upload_posts', async (ids)=>{
+  socket.on('request_upload_posts', async (ids)=> {
     try{
       if(!Array.isArray(ids) || ids.length===0) return;
       for(const id of ids){
@@ -366,7 +360,7 @@
   });
 
   // NEW: server tells this client which server-posts the client is missing
-  socket.on('sync_needed', async (ids)=>{
+  socket.on('sync_needed', async (ids)=> {
     try{
       if(!Array.isArray(ids) || ids.length===0) return;
       socket.emit('request_posts_by_id', ids);
@@ -374,7 +368,7 @@
   });
 
   // NEW: server bulk-sends posts requested by this client
-  socket.on('bulk_posts', async (posts)=>{
+  socket.on('bulk_posts', async (posts)=> {
     try{
       if(!Array.isArray(posts) || posts.length===0) return;
       for(const p of posts){
@@ -389,9 +383,11 @@
     for(const m of messages||[]){ try{ if(!(await existsMessageInDB(m.id))) await saveMessageToDB(m); }catch(e){} }
     // if panel open, reload messages
     if(chatPanelOpen) loadAndRenderMessages();
+    // also update PM contacts UI if open
+    if(privateMessengerOpen) await renderPMContacts();
   });
 
-  socket.on('message', async (msg)=>{ // single new message from server
+  socket.on('message', async (msg)=>{ // single new message from server (global chat)
     try{
       if(!(await existsMessageInDB(msg.id))){
         await saveMessageToDB(msg);
@@ -420,8 +416,8 @@
   const lbOverlay = document.getElementById('lightboxOverlay'); const lbInner = document.querySelector('.lightbox-inner'); const lbCanvas = document.querySelector('.lightbox-canvas'); const lbImgEl = document.getElementById('lbImg'); const lbCaptionEl = document.getElementById('lbCaption'); const btnIn = document.getElementById('zoomIn'); const btnOut = document.getElementById('zoomOut'); const btnReset = document.getElementById('resetZoom'); const btnClose = document.getElementById('closeLBox');
 
   let viewer = { scale:1, min:1, max:4, x:0, y:0, dragging:false };
-  function openLightbox(src, caption){ lbImgEl.src = src; lbImgEl.alt = caption||''; lbCaptionEl.textContent = caption||''; viewer.scale = 1; viewer.x=0; viewer.y=0; lbImgEl.style.transform = 'translate(0px,0px) scale(1)'; lbOverlay.classList.add('open'); lbOverlay.setAttribute('aria-hidden','false'); btnClose.focus(); }
-  function closeLightbox(){ lbOverlay.classList.remove('open'); lbOverlay.setAttribute('aria-hidden','true'); setTimeout(()=> lbImgEl.src='', 300); }
+  function openLightbox(src, caption){ lbImgEl.src = src; lbImgEl.alt = caption||''; lbCaptionEl.textContent = caption||''; viewer.scale = 1; viewer.x=0; viewer.y=0; lbImgEl.style.transform = 'translate(0px,0px) scale(1)'; lbOverlay.classList.add('open'); lbOverlay.setAttribute('aria-hidden','false'); btnClose.focus(); document.body.classList.add('lightbox-open'); }
+  function closeLightbox(){ lbOverlay.classList.remove('open'); lbOverlay.setAttribute('aria-hidden','true'); setTimeout(()=> lbImgEl.src='', 300); document.body.classList.remove('lightbox-open'); }
   btnClose.addEventListener('click', closeLightbox);
 
   function applyViewer(){ lbImgEl.style.transform = `translate(${viewer.x}px, ${viewer.y}px) scale(${viewer.scale})`; }
@@ -528,9 +524,301 @@
     if(chatPanelOpen) await loadAndRenderMessages();
   }
 
-  // ---------- Socket: request messages on connect (already emitted above) ----------
-  // 'message' event handled earlier: it saves and appends/increments unread.
-  // For safety, also handle local saves to show messages immediately when user sends.
+  // ---------- PRIVATE MESSENGER: three-dot + panel integration ----------
+  const threeDotToggle = document.getElementById('threeDotToggle');
+  const threeDotDropdown = document.getElementById('threeDotDropdown');
+  const openPrivateBtn = document.getElementById('open-private-messenger');
+  const openGroupBtn = document.getElementById('open-group-messages');
+  const privateMessengerPanel = document.getElementById('privateMessengerPanel');
+  const pmUserList = document.getElementById('pm-user-list');
+  const pmUserTemplate = document.getElementById('pm-user-template');
+  const pmChatArea = document.getElementById('pm-chat-area');
+  const pmChatMessages = document.getElementById('pm-chat-messages');
+  const pmChatForm = document.getElementById('pm-chat-form');
+  const pmChatInput = document.getElementById('pmChatInput');
+  const pmSendBtn = document.getElementById('pmSendBtn');
+  const pmCloseBtn = document.getElementById('pmCloseBtn');
+  const pmBackBtn = document.getElementById('pm-back-to-list');
+  const pmRefreshBtn = document.getElementById('pmRefresh');
+
+  let privateMessengerOpen = false;
+  let selectedPMUserId = null;
+  let selectedPMUserName = null;
+
+  // Dropdown toggle
+  if(threeDotToggle){
+    threeDotToggle.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const isHidden = threeDotDropdown && threeDotDropdown.hasAttribute('hidden');
+      if(threeDotDropdown){
+        if(isHidden){ threeDotDropdown.removeAttribute('hidden'); threeDotToggle.setAttribute('aria-expanded','true'); threeDotDropdown.querySelector('button')?.focus(); }
+        else { threeDotDropdown.setAttribute('hidden',''); threeDotToggle.setAttribute('aria-expanded','false'); }
+      }
+    });
+    // close on outside click
+    document.addEventListener('click', (e)=>{ if(threeDotDropdown && !threeDotDropdown.contains(e.target) && !threeDotToggle.contains(e.target)){ threeDotDropdown.setAttribute('hidden',''); threeDotToggle.setAttribute('aria-expanded','false'); } });
+  }
+
+  // Open private messenger
+  if(openPrivateBtn){
+    openPrivateBtn.addEventListener('click', async (e)=>{
+      e.stopPropagation();
+      try{ openPrivateMessenger(); }catch(err){ console.error(err); }
+      // hide dropdown
+      if(threeDotDropdown) { threeDotDropdown.setAttribute('hidden',''); threeDotToggle.setAttribute('aria-expanded','false'); }
+    });
+  }
+  // optional group open
+  if(openGroupBtn){
+    openGroupBtn.addEventListener('click',(e)=>{ e.stopPropagation(); alert('Group messages already available via global chat button.'); if(threeDotDropdown){ threeDotDropdown.setAttribute('hidden',''); threeDotToggle.setAttribute('aria-expanded','false'); } });
+  }
+
+  // open/close private messenger functions
+  async function openPrivateMessenger(){
+    privateMessengerPanel.removeAttribute('hidden'); privateMessengerPanel.setAttribute('aria-hidden','false'); privateMessengerPanel.classList.add('open'); privateMessengerOpen = true;
+    // populate contacts
+    await renderPMContacts();
+    // focus first contact or back
+    const first = pmUserList.querySelector('button');
+    if(first) first.focus();
+  }
+  function closePrivateMessenger(){
+    privateMessengerPanel.setAttribute('hidden',''); privateMessengerPanel.setAttribute('aria-hidden','true'); privateMessengerPanel.classList.remove('open'); privateMessengerOpen = false;
+    selectedPMUserId = null; selectedPMUserName = null;
+    pmChatArea.setAttribute('hidden','');
+  }
+  if(pmCloseBtn) pmCloseBtn.addEventListener('click', ()=> closePrivateMessenger());
+  if(pmBackBtn) pmBackBtn.addEventListener('click', ()=> { // go back to contacts list
+    selectedPMUserId = null; selectedPMUserName = null;
+    pmChatArea.setAttribute('hidden','');
+    // restore contacts scroll/focus
+    pmUserList.querySelector('button')?.focus();
+  });
+  if(pmRefreshBtn) pmRefreshBtn.addEventListener('click', async ()=> { pmRefreshBtn.textContent = '...'; await renderPMContacts(); setTimeout(()=> pmRefreshBtn.textContent = '↻', 700); });
+
+  // helper: compute contact list from activeUsers + historical private message partners
+  async function gatherContacts(){
+    const contacts = new Map(); // id -> {userId, userName, lastSeen, unreadCount}
+    // activeUsers first
+    for(const [id,u] of activeUsers.entries()){
+      if(id === currentUserId) continue;
+      contacts.set(id, { userId:id, userName:u.userName||id, lastSeen: u.lastSeen || Date.now(), unread: 0 });
+    }
+    // historical partners from messages
+    try{
+      const msgs = await getAllMessagesFromDB();
+      msgs.forEach(m=>{
+        // consider private messages to/from currentUser: check fields 'fromId' and 'toId' or fallback 'userId'
+        const from = m.fromId || m.userId || null;
+        const to = m.toId || m.to || null;
+        if(from && to){
+          const partner = (from === currentUserId) ? to : (to === currentUserId ? from : null);
+          if(partner && partner !== currentUserId){
+            const existing = contacts.get(partner) || { userId:partner, userName: m.fromName||m.toName||partner, lastSeen:0, unread:0 };
+            // lastSeen try to get from message timestamp
+            existing.lastSeen = Math.max(existing.lastSeen || 0, new Date(m.created_at).getTime());
+            contacts.set(partner, existing);
+          }
+        } else {
+          // fallback: if message has userId and it's not currentUser, add that person
+          if(m.userId && m.userId !== currentUserId){
+            const existing = contacts.get(m.userId) || { userId:m.userId, userName: m.userName||m.userId, lastSeen:0, unread:0 };
+            existing.lastSeen = Math.max(existing.lastSeen || 0, new Date(m.created_at).getTime());
+            contacts.set(m.userId, existing);
+          }
+        }
+      });
+    }catch(e){ console.warn('gatherContacts failed', e); }
+
+    // compute unread counts per contact (simple: messages addressed to me that are not read)
+    try{
+      const msgs = await getAllMessagesFromDB();
+      msgs.forEach(m=>{
+        const from = m.fromId || m.userId || null;
+        const to = m.toId || m.to || null;
+        if(to === currentUserId && from && contacts.has(from)){
+          const c = contacts.get(from); c.unread = (c.unread||0) + 1;
+          contacts.set(from, c);
+        }
+      });
+    }catch(e){}
+
+    // sort by lastSeen desc
+    const arr = Array.from(contacts.values()).sort((a,b)=> (b.lastSeen||0) - (a.lastSeen||0));
+    return arr;
+  }
+
+  // render contacts UI
+  async function renderPMContacts(){
+    pmUserList.innerHTML = '';
+    const contacts = await gatherContacts();
+    if(contacts.length===0){
+      const li = document.createElement('li'); li.className = 'pm-empty'; li.textContent = 'কোনো যোগাযোগ নেই'; pmUserList.appendChild(li); return;
+    }
+    contacts.forEach(c=>{
+      const node = pmUserTemplate.content.cloneNode(true);
+      const li = node.querySelector('.pm-user-item');
+      const btn = node.querySelector('.pm-user-btn');
+      btn.dataset.userId = c.userId;
+      const nameEl = node.querySelector('.pm-user-name');
+      nameEl.textContent = c.userName || c.userId;
+      // badge for unread
+      if(c.unread && c.unread>0){
+        const span = document.createElement('span');
+        span.className = 'pm-unread-badge';
+        span.textContent = c.unread>99 ? '99+' : String(c.unread);
+        span.style.marginLeft='8px';
+        span.style.fontSize='12px';
+        span.style.background='var(--c3)';
+        span.style.color='#fff';
+        span.style.padding='2px 6px';
+        span.style.borderRadius='999px';
+        btn.appendChild(span);
+      }
+      btn.addEventListener('click', async (e)=>{ e.stopPropagation(); const uid = btn.dataset.userId; await openConversationWith(uid, c.userName||uid); });
+      pmUserList.appendChild(li);
+    });
+  }
+
+  // load conversation messages (private) between currentUserId and otherId
+  async function loadConversationFromDB(otherId){
+    pmChatMessages.innerHTML = '';
+    const msgs = await getAllMessagesFromDB();
+    const convo = msgs.filter(m=>{
+      const from = m.fromId || m.userId || null;
+      const to = m.toId || m.to || null;
+      // consider only messages that have to/from pair
+      if(from && to) return (from === currentUserId && to === otherId) || (from === otherId && to === currentUserId);
+      // fallback: if no explicit to/from, try userId == otherId or userId == currentUser and meta 'to'
+      if(m.userId && m.userId === currentUserId && (m.toId === otherId || m.to === otherId)) return true;
+      if(m.userId && m.userId === otherId && (m.toId === currentUserId || m.to === currentUserId)) return true;
+      return false;
+    });
+    // sort by created_at ascending (getAllMessagesFromDB already sorted asc)
+    convo.forEach(m => {
+      appendPrivateMessageToUI(m, otherId);
+    });
+    pmChatMessages.scrollTop = pmChatMessages.scrollHeight;
+  }
+
+  function appendPrivateMessageToUI(msg, otherId){
+    const div = document.createElement('div');
+    const isSent = (msg.fromId === currentUserId) || (msg.userId === currentUserId && (!msg.toId || msg.toId));
+    div.className = 'pm-msg' + (isSent ? ' sent' : '');
+    const when = new Date(msg.created_at).toLocaleString();
+    const meta = `<span style="font-weight:800">${escapeHtml(msg.fromName||msg.userName|| (isSent ? 'You' : 'Them'))}</span>`;
+    div.innerHTML = `${escapeHtml(msg.text)}<div class="pm-meta">${meta} • <small style="color:var(--muted)">${when}</small></div>`;
+    pmChatMessages.appendChild(div);
+  }
+
+  // open conversation UI with a contact
+  async function openConversationWith(otherId, otherName){
+    selectedPMUserId = otherId;
+    selectedPMUserName = otherName || otherId;
+    // show chat area
+    pmChatArea.removeAttribute('hidden');
+    // render header name
+    const chatWithNameEl = document.getElementById('pm-chat-with-name');
+    if(chatWithNameEl) chatWithNameEl.textContent = selectedPMUserName;
+    // load messages
+    await loadConversationFromDB(otherId);
+    // mark unread for this contact as read (simple approach: remove unread badges)
+    const btn = Array.from(pmUserList.querySelectorAll('button')).find(b=> b.dataset.userId === otherId);
+    if(btn){
+      const badge = btn.querySelector('.pm-unread-badge');
+      if(badge) badge.remove();
+    }
+    pmChatInput.focus();
+  }
+
+  // send private messages
+  pmChatForm.addEventListener('submit', async (e)=>{ e.preventDefault(); const text = (pmChatInput.value||'').trim(); if(!text || !selectedPMUserId) return; await sendPrivateMessageTo(selectedPMUserId, text); pmChatInput.value=''; });
+  pmSendBtn.addEventListener('click', async ()=>{ const text = (pmChatInput.value||'').trim(); if(!text || !selectedPMUserId) return; await sendPrivateMessageTo(selectedPMUserId, text); pmChatInput.value=''; });
+
+  async function sendPrivateMessageTo(otherId, text){
+    const msg = {
+      id: uid(),
+      fromId: currentUserId,
+      fromName: currentUser,
+      toId: otherId,
+      toName: null,
+      text,
+      created_at: timeNow()
+    };
+    try{
+      // save locally
+      await saveMessageToDB(msg);
+      // append immediately if chatting with same user
+      if(selectedPMUserId === otherId) appendPrivateMessageToUI(msg, otherId);
+      // emit to server (server must deliver only to recipient + sender)
+      socket.emit('private_message', msg);
+    }catch(e){ console.error('private send failed', e); alert('Failed to send private message'); }
+  }
+
+  // handle incoming private_message
+  socket.on('private_message', async (msg)=> {
+    try{
+      // basic shaping: ensure fields present
+      if(!msg || !msg.id) return;
+      // save if new
+      if(!(await existsMessageInDB(msg.id))){
+        await saveMessageToDB(msg);
+      }
+      // if pm panel open and selected matches, append to UI
+      const otherId = (msg.fromId === currentUserId) ? msg.toId : msg.fromId;
+      if(privateMessengerOpen && selectedPMUserId && (msg.fromId === selectedPMUserId || msg.toId === selectedPMUserId)){
+        appendPrivateMessageToUI(msg, selectedPMUserId);
+        pmChatMessages.scrollTop = pmChatMessages.scrollHeight;
+      } else {
+        // mark unread badge on contact (if exists), otherwise we will show it when rendering contacts
+        const btn = Array.from(pmUserList.querySelectorAll('button')).find(b=> b.dataset.userId === (msg.fromId === currentUserId ? msg.toId : msg.fromId));
+        if(btn){
+          let badge = btn.querySelector('.pm-unread-badge');
+          if(badge){
+            // increment numeric value if possible
+            const v = parseInt(badge.textContent||'0',10) || 0;
+            badge.textContent = v+1;
+          } else {
+            badge = document.createElement('span');
+            badge.className = 'pm-unread-badge';
+            badge.textContent = '1';
+            badge.style.marginLeft='8px';
+            badge.style.fontSize='12px';
+            badge.style.background='var(--c3)';
+            badge.style.color='#fff';
+            badge.style.padding='2px 6px';
+            badge.style.borderRadius='999px';
+            btn.appendChild(badge);
+          }
+        }
+      }
+      // also update contacts UI in background
+      if(privateMessengerOpen) await renderPMContacts();
+    }catch(e){ console.error('[private_message] handler error', e); }
+  });
+
+  // when server sends a contacts list (optional)
+  socket.on('contacts', async (list) => {
+    try{
+      if(!Array.isArray(list)) return;
+      // add any contact details to activeUsers map (so UI shows names)
+      list.forEach(c=>{
+        if(c && c.userId && c.userId !== currentUserId){
+          markUserActive({ userId: c.userId, userName: c.userName || c.name, socketId: c.socketId || null });
+        }
+      });
+      renderActiveUsers();
+      if(privateMessengerOpen) await renderPMContacts();
+    }catch(e){ console.error('contacts handler', e); }
+  });
+
+  // close messenger on outside click (defensive)
+  document.addEventListener('click', (e)=> {
+    if(privateMessengerOpen && privateMessengerPanel && !privateMessengerPanel.contains(e.target) && !threeDotToggle.contains(e.target) && !openPrivateBtn.contains(e.target)){
+      // don't auto-close if clicking inside dropdown area etc.
+      // optional: keep open; for now do nothing (user should manually close)
+    }
+  });
 
   // ---------- Initial load ----------
   (async ()=>{ await openDB(); await loadAndRenderFeed(); // preload messages count for badge

@@ -57,6 +57,22 @@
     </noscript>
   </div>
 
+  <!-- ========== NEW: Three-dot menu (left side) ========== -->
+  <!-- টিপলে ড্রপডাউন খোলা যাবে; ড্রপডাউনে "Messenger" অপশন আছে যা প্রাইভেট মেসেঞ্জার খুলবে -->
+  <div id="three-dot-container" class="three-dot-container" aria-hidden="false">
+    <button id="threeDotToggle" class="three-dot-btn" aria-haspopup="true" aria-expanded="false" aria-controls="threeDotDropdown" title="More">
+      ⋯
+    </button>
+
+    <div id="threeDotDropdown" class="three-dot-dropdown" role="menu" hidden aria-hidden="true">
+      <!-- অন্য মেনু আইটেম যোগ করা যাবে -->
+      <button id="open-private-messenger" class="three-dot-item" role="menuitem" type="button">Messenger (Private)</button>
+      <button id="open-group-messages" class="three-dot-item" role="menuitem" type="button">Group Messages</button>
+      <!-- Add more actions here if needed -->
+    </div>
+  </div>
+  <!-- ========== end three-dot ========== -->
+
   <div class="wrap">
     <header class="app">
       <div style="display:flex;align-items:center">
@@ -105,7 +121,7 @@
     </div>
   </div>
 
-  <!-- Chat UI: floating button + panel -->
+  <!-- Chat UI: floating button + panel (global messages) -->
   <button id="chatToggleBtn" class="chat-button" aria-label="Open global messages">💬
     <span id="chatUnread" class="chat-unread" style="display:none">0</span>
   </button>
@@ -123,6 +139,57 @@
       <button id="chatSendBtn">Send</button>
     </div>
   </div>
+
+  <!-- ========== NEW: Private Messenger Panel (opened from three-dot -> Messenger) ========== -->
+  <aside id="privateMessengerPanel" class="private-messenger-panel" role="dialog" aria-label="Private messenger" aria-hidden="true" hidden>
+    <header class="pm-header">
+      <div class="pm-title">Messenger</div>
+      <div class="pm-controls">
+        <button id="pmCloseBtn" class="pm-close" aria-label="Close messenger">✕</button>
+      </div>
+    </header>
+
+    <div class="pm-body">
+      <!-- contacts list -->
+      <section class="pm-contacts" aria-label="Contacts">
+        <div class="pm-contacts-header">
+          <strong>Contacts</strong>
+          <button id="pmRefresh" class="pm-refresh" title="Refresh contacts">↻</button>
+        </div>
+
+        <template id="pm-user-template">
+          <li class="pm-user-item" data-user-id="">
+            <button class="pm-user-btn" type="button" aria-label="Open chat with user">
+              <span class="pm-user-name">Name</span>
+              <span class="pm-user-status" aria-hidden="true">●</span>
+            </button>
+          </li>
+        </template>
+
+        <ul id="pm-user-list" class="pm-user-list" role="list" aria-live="polite">
+          <li class="pm-empty">কোনো যোগাযোগ নেই</li>
+        </ul>
+      </section>
+
+      <!-- private chat area (hidden until a contact is selected) -->
+      <section id="pm-chat-area" class="pm-chat-area" aria-label="Chat area" hidden>
+        <div class="pm-chat-header">
+          <button id="pm-back-to-list" class="pm-back" aria-label="Back to contacts">←</button>
+          <h4 id="pm-chat-with-name">Person</h4>
+        </div>
+
+        <div id="pm-chat-messages" class="pm-chat-messages" aria-live="polite">
+          <!-- messages loaded here -->
+        </div>
+
+        <form id="pm-chat-form" class="pm-chat-form" autocomplete="off">
+          <input id="pmChatInput" type="text" placeholder="Type a private message..." aria-label="Type a private message" />
+          <button id="pmSendBtn" type="submit">Send</button>
+        </form>
+      </section>
+    </div>
+  </aside>
+  <!-- ========== end private messenger ========== -->
 
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js" defer></script>
   <!-- script.js will wire up socket events, toggle behavior, and list rendering -->

@@ -1,4 +1,5 @@
 // server.js (presence-enabled, Node >= 14, no extra deps)
+// Updated: adds private_message routing, contacts endpoint, light validation
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -53,11 +54,13 @@ function pushPostToCache(post){
   }
 }
 function pushMessageToCache(msg){
+  if(!msg || !msg.id) return;
   MESSAGES_CACHE.push(msg);
   if(MESSAGES_CACHE.length > MESSAGES_CACHE_MAX) MESSAGES_CACHE.splice(0, MESSAGES_CACHE.length - MESSAGES_CACHE_MAX);
 }
 
 app.use(express.static(path.join(__dirname, 'public')));
+// NOTE: limit controls JSON body max size (images embedded as dataURL will be limited)
 app.use(express.json({limit: '10mb'})); // allow JSON uploads for small images (dev)
 
 // ---------- Presence structures ----------
@@ -155,13 +158,12 @@ io.on('connection', (socket) => {
     try {
       if(!payload || !payload.userId) return;
       markSocketForUser(socket.id, payload.userId, payload.userName || payload.name);
-      // optionally respond with current active list
+      // respond with current active list
       socket.emit('active_users', getActiveUsersArray());
 
       // ask all connected clients to announce what posts they have so server can reconcile
       // (this helps when clients have local-only images that server hasn't seen yet)
       for(const [sId, s] of io.sockets.sockets){
-        // ask each socket to announce its local posts
         try { s.emit('please_announce_posts'); } catch(e){}
       }
     } catch(err){ console.error('[ERR] im_here', err); }
@@ -193,7 +195,6 @@ io.on('connection', (socket) => {
   });
 
   // NEW POST (client uploads full post including image data)
-  // post should include: { id, created_at, userId, userName, kind:'image', url?, blobBase64?, meta:{} }
   socket.on('upload_full_post', (post) => {
     try {
       if(!post) return;
@@ -210,7 +211,6 @@ io.on('connection', (socket) => {
   });
 
   // Client announces a list of posts it currently has locally (metadata only)
-  // payload: [{id, created_at, userId, meta:{thumbUrl?, size?}, hasBlob: true|false}, ...]
   socket.on('announce_posts', (list) => {
     try {
       if(!Array.isArray(list)) return;
@@ -290,6 +290,53 @@ io.on('connection', (socket) => {
     } catch(err){ console.error('[ERR] message', err); }
   });
 
+  // ---------- NEW: PRIVATE MESSAGE (deliver only to recipient + sender) ----------
+  // Expect msg: { id?, fromId, fromName?, toId, toName?, text, created_at? }
+  socket.on('private_message', (msg) => {
+    try {
+      if(!msg || typeof msg !== 'object') return;
+      // basic validation
+      if(!msg.fromId || !msg.toId || typeof msg.text !== 'string' || msg.text.trim().length === 0) {
+        // invalid payload — ignore silently (or emit error)
+        socket.emit('error', { code: 'INVALID_PRIVATE_MESSAGE', message: 'Invalid private_message payload' });
+        return;
+      }
+      if(!msg.id) msg.id = uid();
+      if(!msg.created_at) msg.created_at = nowISO();
+
+      // push into message cache (server keeps all messages in MESSAGES_CACHE)
+      pushMessageToCache(msg);
+
+      // send to recipient sockets
+      const recipient = USERS.get(msg.toId);
+      if(recipient && recipient.sockets && recipient.sockets.size){
+        for(const sId of recipient.sockets){
+          io.to(sId).emit('private_message', msg);
+        }
+      }
+
+      // also send to all sockets of sender (so sender gets delivered copy/ack)
+      const senderEntry = USERS.get(msg.fromId);
+      if(senderEntry && senderEntry.sockets && senderEntry.sockets.size){
+        for(const sId of senderEntry.sockets){
+          io.to(sId).emit('private_message', msg);
+        }
+      } else {
+        // fallback: echo to the socket that sent if we can't find sender mapping
+        socket.emit('private_message', msg);
+      }
+
+      console.log('[RECV] private_message', msg.id, 'from', msg.fromId, 'to', msg.toId);
+    } catch(err){ console.error('[ERR] private_message', err); }
+  });
+
+  // Optional: client asks for "contacts" (simple active users snapshot)
+  socket.on('request_contacts', () => {
+    try {
+      socket.emit('contacts', getActiveUsersArray());
+    } catch(e){ console.warn('failed sending contacts', e); }
+  });
+
   // ping (existing)
   socket.on('ping_server', (data) => { socket.emit('pong_server', { serverTime: nowISO(), you: socket.id }); });
 
@@ -304,6 +351,11 @@ io.on('connection', (socket) => {
 // Optional HTTP helper: fetch posts JSON (helpful for clients that want to GET)
 app.get('/posts', (req, res) => {
   res.json({ posts: POSTS_CACHE.slice() });
+});
+
+// optional HTTP helper: fetch recent messages (not private filtered) - returns server cache
+app.get('/messages', (req, res) => {
+  res.json({ messages: MESSAGES_CACHE.slice() });
 });
 
 const PORT = process.env.PORT || 3000;
