@@ -855,8 +855,15 @@
 
   // send private messages
   // guard: avoid duplicate submit if form already in sending state
-  pmChatForm.addEventListener('submit', async (e)=>{ e.preventDefault(); if(pmChatForm.classList.contains('sending')) return; const text = (pmChatInput.value||'').trim(); if(!text || !selectedPMUserId) return; await sendPrivateMessageTo(selectedPMUserId, text); pmChatInput.value=''; });
-  pmSendBtn.addEventListener('click', async ()=>{ if(pmChatForm.classList.contains('sending')) return; const text = (pmChatInput.value||'').trim(); if(!text || !selectedPMUserId) return; await sendPrivateMessageTo(selectedPMUserId, text); pmChatInput.value=''; });
+  pmChatForm.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  if(pmChatForm.classList.contains('sending')) return;
+  const text = (pmChatInput.value||'').trim();
+  if(!text || !selectedPMUserId) return;
+  await sendPrivateMessageTo(selectedPMUserId, text);
+  pmChatInput.value='';
+});
+
 
   async function sendPrivateMessageTo(otherId, text){
     const msg = {
