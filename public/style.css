@@ -1,3 +1,12 @@
+/* IBGM — full stylesheet
+   File: ibgm-style.css
+   Includes: main UI, active-users widget, lightbox, chat, three-dot menu,
+   private messenger (horizontal contacts on top), responsive rules, and
+   additional overrides (ID visibility + send-guard).
+
+   Replace your existing style.css with this file or merge as needed.
+*/
+
 :root{
   --c1:#7c3aed;
   --c2:#0ea5e9;
@@ -20,6 +29,14 @@
   --lb-btn-bg-glass: rgba(255,255,255,0.06);
   --lb-btn-border-glass: rgba(255,255,255,0.10);
   --lb-btn-color: rgba(10,14,20,0.95);
+
+  /* --- NEW: Private messenger theme variables (light) --- */
+  --pm-bg: #ffffff;                /* messenger panel background */
+  --pm-surface: #f7f9fc;           /* light surface for lists/messages */
+  --pm-border: rgba(2,6,23,0.06);  /* subtle border on light bg */
+  --pm-text: #071026;              /* dark text for best contrast */
+  --pm-muted: rgba(7,16,38,0.6);   /* muted text on light bg */
+  --pm-shadow: 0 18px 60px rgba(2,6,23,0.06);
 }
 
 /* Base */
@@ -66,7 +83,6 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
 .comment-form button{padding:8px 10px;border-radius:8px;border:0;background:var(--accent);color:#05070f;font-weight:600;cursor:pointer}
 
 /* Lightbox / viewer */
-/* NOTE: z-index increased so overlay sits above sticky header/chat/etc */
 .lightbox-overlay{position:fixed;inset:0;z-index:10150;display:none;align-items:center;justify-content:center;background:linear-gradient(180deg, rgba(2,6,23,0.9), rgba(2,6,23,0.95))}
 .lightbox-overlay.open{display:flex}
 .lightbox-inner{
@@ -84,7 +100,7 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
   box-sizing:border-box;
 }
 .lightbox-canvas{width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
-#lbImg{max-width:100%;max-height:100%;object-fit:contain;touch-action:none;user-select:none;cursor:zoom-in;transition:transform 200ms cubic-bezier(.2,.9,.2,1);}
+#lbImg{max-width:100%;max-height:100%;object-fit:contain;touch-action:none;user-select:none;cursor:zoom-in;transition:transform 200ms cubic-bezier(.2,.9,.2,1);} 
 
 /* --- UPDATED: glass-style, smaller zoom buttons --- */
 .lb-controls{position:absolute;right:14px;top:14px;display:flex;flex-direction:column;gap:10px}
@@ -166,7 +182,7 @@ input[type=file], input[type=text]{padding:10px;border-radius:10px;border:1px so
 .chat-panel{position:fixed; right:18px; bottom:86px; width:320px; max-width:92vw; height:420px; z-index:10055;background:linear-gradient(180deg, rgba(8,12,20,0.95), rgba(4,6,10,0.95)); border:1px solid rgba(255,255,255,0.04);border-radius:12px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 40px rgba(2,6,23,0.7)}
 .chat-header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.02); font-weight:700; color:var(--muted)}
 .chat-messages{flex:1;padding:10px; overflow:auto; display:flex; flex-direction:column; gap:8px; }
-.chat-msg{background:rgba(255,255,255,0.02);padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.02); font-size:13px; color:var(--muted);}
+.chat-msg{background:rgba(255,255,255,0.02);padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.02); font-size:13px; color:var(--muted);} 
 .chat-msg strong{color:var(--text); display:block; font-size:12px;}
 .chat-input{display:flex; gap:8px; padding:10px; border-top:1px solid rgba(255,255,255,0.01);} 
 .chat-input input{flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.01);color:var(--text)}
@@ -376,9 +392,6 @@ body.lightbox-open header.app{padding-top:12px;}
 
 /* ============================
    NEW: FORCE-HIDE ALL UI WHEN LIGHTBOX OPEN
-   Ensures *nothing* (header, active widgets, chat button, feed, wrap, footer, etc)
-   stays visible above the overlay. This is defensive and works even if some
-   elements have higher z-indexes. Use body.classList.add('lightbox-open') in JS.
    ============================ */
 
 /* Make sure body can't scroll behind the lightbox */
@@ -533,10 +546,12 @@ body.lightbox-open #lbImg {
   width:380px;
   max-width: min(92vw, 420px);
   z-index:10090;
-  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-  border:1px solid rgba(255,255,255,0.04);
+  /* SWITCHED to light background for readability */
+  background: var(--pm-bg);
+  color: var(--pm-text);
+  border:1px solid var(--pm-border);
   border-radius:12px;
-  box-shadow: 0 22px 60px rgba(2,6,23,0.65);
+  box-shadow: var(--pm-shadow);
   display:flex;
   flex-direction:column;
   overflow:hidden;
@@ -559,64 +574,134 @@ body.lightbox-open #lbImg {
   align-items:center;
   justify-content:space-between;
   padding:10px 12px;
-  border-bottom:1px solid rgba(255,255,255,0.02);
-  background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.0));
+  border-bottom:1px solid var(--pm-border);
+  background: transparent;
 }
-.pm-title{font-weight:800;color:var(--text)}
+.pm-title{font-weight:800;color:var(--pm-text)}
 .pm-controls .pm-close{
-  border:0;background:transparent;color:var(--muted);font-size:18px;cursor:pointer;padding:6px;border-radius:8px
+  border:0;background:transparent;color:var(--pm-muted);font-size:18px;cursor:pointer;padding:6px;border-radius:8px
 }
-.pm-controls .pm-close:hover{ color:var(--text); background:rgba(255,255,255,0.02) }
+.pm-controls .pm-close:hover{ color:var(--pm-text); background:transparent }
 
-/* body layout: contacts left (column) + chat area right (flex) */
+/* ===========================
+   KEY CHANGE: Contacts now SHOW ON TOP (horizontal)
+   ===========================
+*/
+
+/* body layout: contacts on TOP (row) + chat area below (column) */
 .pm-body{
   display:flex;
+  flex-direction:column; /* changed: column so contacts sit above chat */
   flex:1;
   min-height:0; /* allow children to shrink for correct overflow handling */
+  gap:0;
 }
 
-/* contacts list */
+/* contacts list — now a top horizontal strip */
 .pm-contacts{
-  width:42%;
-  min-width:120px;
-  max-width:160px;
-  border-right:1px solid rgba(255,255,255,0.02);
+  width:100%;
+  min-height:84px;            /* make it visible and tappable */
+  max-height:140px;
+  border-right:0;             /* removed right border */
+  border-bottom:1px solid var(--pm-border); /* new bottom border */
   padding:10px;
   display:flex;
-  flex-direction:column;
+  flex-direction:row;         /* horizontal contact items */
   gap:8px;
-  background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
-  overflow:hidden;
+  align-items:center;
+  background:var(--pm-surface);
+  overflow-x:auto;            /* allow horizontal scroll for many contacts */
+  -webkit-overflow-scrolling:touch;
 }
-.pm-contacts-header{display:flex;align-items:center;justify-content:space-between;padding-bottom:6px}
-.pm-refresh{border:0;background:transparent;color:var(--muted);cursor:pointer;padding:6px;border-radius:8px}
-.pm-refresh:hover{ color:var(--text); background:rgba(255,255,255,0.02) }
 
-.pm-user-list{list-style:none;margin:0;padding:0;overflow:auto;display:flex;flex-direction:column;gap:6px}
-.pm-user-item{display:block}
-.pm-user-btn{
-  width:100%;
-  text-align:left;
+/* contacts header (optional tools & refresh) */
+.pm-contacts-header{
   display:flex;
   align-items:center;
-  justify-content:space-between;
   gap:8px;
+  margin-right:8px;
+  flex:0 0 auto;
+}
+.pm-refresh{border:0;background:transparent;color:var(--pm-muted);cursor:pointer;padding:6px;border-radius:8px}
+.pm-refresh:hover{ color:var(--pm-text); background:transparent }
+
+/* ========== UPDATED BLOCK: user list (horizontal) ==========
+   Replaced previous overflow:hidden with horizontal scroll support.
+   This ensures many contacts are visible via scrolling.
+============================================================= */
+.pm-user-list{
+  list-style:none;
+  margin:0;
+  padding:0;
+  display:flex;
+  flex-direction:row; /* horizontal items */
+  gap:8px;
+  align-items:center;
+
+  /* allow horizontal scrolling when many contacts */
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch; /* smooth native momentum scrolling on iOS */
+  scroll-behavior: smooth;           /* smooth when programmatically scrolled */
+
+  /* keep content from wrapping */
+  white-space: nowrap;
+}
+
+/* horizontal scrollbar styling for modern browsers */
+.pm-user-list::-webkit-scrollbar{ height:10px; }
+.pm-user-list::-webkit-scrollbar-thumb{ background:rgba(2,6,23,0.08); border-radius:999px; }
+.pm-user-list::-webkit-scrollbar-track{ background:transparent; }
+
+/* each item adjusted for horizontal layout */
+.pm-user-item{
+  display:block;
+  flex: 0 0 auto;
+  min-width:110px; /* card-like clickable area */
+}
+.pm-user-btn{
+  width:100%;
+  text-align:center;
+  display:flex;
+  flex-direction:column;  /* avatar above name */
+  align-items:center;
+  justify-content:center;
+  gap:6px;
   padding:8px;
-  border-radius:8px;
-  border:1px solid rgba(255,255,255,0.02);
+  border-radius:10px;
+  border:1px solid transparent;
   background:transparent;
-  color:var(--muted);
+  color:var(--pm-text);
   cursor:pointer;
   font-weight:700;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
-.pm-user-btn:hover{ background:rgba(255,255,255,0.02); color:var(--text) }
-.pm-user-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
-.pm-user-status{margin-left:8px;color:var(--c2);font-size:14px}
+.pm-user-btn:hover{ background:var(--pm-bg); color:var(--pm-text); box-shadow: 0 6px 18px rgba(2,6,23,0.03)}
+.pm-user-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;font-size:13px;max-width:100%}
+.pm-user-status{margin-left:0;color:var(--c2);font-size:12px;display:block}
+
+/* avatar support (if you use img or span) */
+.pm-user-avatar{
+  width:40px;
+  height:40px;
+  border-radius:999px;
+  display:inline-block;
+  background:linear-gradient(90deg,var(--c1),var(--c2));
+  color:#fff;
+  font-weight:800;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:14px;
+  flex-shrink:0;
+}
 
 /* empty state */
-.pm-empty{color:var(--muted);padding:8px;text-align:center}
+.pm-empty{color:var(--pm-muted);padding:8px;text-align:center}
 
-/* chat area */
+/* chat area (below contacts) */
 .pm-chat-area{
   flex:1;
   display:flex;
@@ -624,17 +709,19 @@ body.lightbox-open #lbImg {
   min-width:0;
   overflow:hidden;
 }
+
+/* chat header */
 .pm-chat-header{
   display:flex;
   align-items:center;
   gap:10px;
   padding:8px 12px;
-  border-bottom:1px solid rgba(255,255,255,0.02);
-  background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.0));
+  border-bottom:1px solid var(--pm-border);
+  background: transparent;
 }
-.pm-back{border:0;background:transparent;color:var(--muted);cursor:pointer;padding:6px;border-radius:8px}
-.pm-back:hover{ color:var(--text); background:rgba(255,255,255,0.02) }
-#pm-chat-with-name{margin:0;font-size:14px;font-weight:800;color:var(--text)}
+.pm-back{border:0;background:transparent;color:var(--pm-muted);cursor:pointer;padding:6px;border-radius:8px}
+.pm-back:hover{ color:var(--pm-text); background:transparent }
+#pm-chat-with-name{margin:0;font-size:14px;font-weight:800;color:var(--pm-text)}
 
 /* messages area */
 .pm-chat-messages{
@@ -644,7 +731,7 @@ body.lightbox-open #lbImg {
   flex-direction:column;
   gap:8px;
   padding:12px;
-  background:linear-gradient(180deg, rgba(255,255,255,0.005), transparent);
+  background:transparent;
 }
 
 /* individual message bubbles */
@@ -654,18 +741,19 @@ body.lightbox-open #lbImg {
   border-radius:12px;
   font-size:13px;
   line-height:1.3;
-  border:1px solid rgba(255,255,255,0.02);
-  background: rgba(255,255,255,0.01);
-  color:var(--muted);
+  border:1px solid var(--pm-border);
+  background: var(--pm-surface);
+  color:var(--pm-text);
   align-self:flex-start;
   word-break:break-word;
 }
-.pm-msg .pm-meta{display:block;font-size:11px;color:var(--muted);margin-top:6px}
+.pm-msg .pm-meta{display:block;font-size:11px;color:var(--pm-muted);margin-top:6px}
 .pm-msg.sent{
   align-self:flex-end;
+  /* keep accent gradient but make text dark for contrast */
   background: linear-gradient(180deg, rgba(14,165,233,0.12), rgba(124,58,237,0.12));
-  color:#071026;
-  border:1px solid rgba(255,255,255,0.03);
+  color:var(--pm-text);
+  border:1px solid rgba(2,6,23,0.04);
   font-weight:700;
 }
 
@@ -674,16 +762,16 @@ body.lightbox-open #lbImg {
   display:flex;
   gap:8px;
   padding:10px;
-  border-top:1px solid rgba(255,255,255,0.01);
-  background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+  border-top:1px solid var(--pm-border);
+  background: transparent;
 }
 .pm-chat-form input{
   flex:1;
   padding:8px 10px;
   border-radius:10px;
-  border:1px solid rgba(255,255,255,0.04);
-  background:rgba(255,255,255,0.01);
-  color:var(--text);
+  border:1px solid var(--pm-border);
+  background:var(--pm-surface);
+  color:var(--pm-text);
 }
 .pm-chat-form button{
   padding:8px 12px;
@@ -695,14 +783,15 @@ body.lightbox-open #lbImg {
   cursor:pointer;
 }
 
-/* small tweaks for scrollbars inside pm lists/messages */
+/* small tweaks for scrollbars inside pm lists/messages (visible on light bg) */
 .pm-user-list::-webkit-scrollbar,
 .pm-chat-messages::-webkit-scrollbar{
+  height:10px;
   width:10px;
 }
 .pm-user-list::-webkit-scrollbar-thumb,
 .pm-chat-messages::-webkit-scrollbar-thumb{
-  background:rgba(255,255,255,0.04);
+  background:rgba(2,6,23,0.08);
   border-radius:999px;
 }
 
@@ -725,7 +814,8 @@ body.lightbox-open #lbImg {
     bottom:12px;
     border-radius:10px;
   }
-  .pm-contacts{ display:none } /* show list back button and only chat area on very small screens */
+  /* show contacts as top horizontal strip on small screens too */
+  .pm-contacts{ display:flex; max-height:110px; min-height:72px; padding:8px; gap:8px; }
   .pm-body{ flex-direction:column }
   .pm-chat-area{ flex:1 }
   .pm-header{ padding:12px }
@@ -746,3 +836,200 @@ body.lightbox-open #lbImg {
 }
 
 /* End of new messenger styles */
+
+/* ============================
+   === MOBILE: MOVE 3-DOT TO BOTTOM-LEFT
+   ============================ */
+
+/* Move the three-dot container to bottom-left on mobile (overrides default top-left)
+   and adjust dropdown to open upward so it doesn't go off-screen. */
+@media (max-width:768px){
+  #three-dot-container{
+    top: auto;
+    bottom: 18px;
+    left: 18px;
+    right: auto;
+    transform: none;
+    /* ensure it's above other bottom UI but below lightbox if opened */
+    z-index: 10110;
+  }
+
+  /* make the button a bit more touch-friendly on mobile */
+  .three-dot-btn{
+    width:56px;
+    height:56px;
+    border-radius:999px;
+    font-size:20px;
+    box-shadow: 0 10px 30px rgba(2,6,23,0.55);
+  }
+
+  /* Dropdown should open upward (bottom of button) on mobile */
+  .three-dot-dropdown{
+    top: auto;
+    bottom: calc(100% + 8px);
+    left: 0;
+    right: auto;
+    transform-origin: bottom left;
+    box-shadow: 0 14px 40px rgba(2,6,23,0.45);
+  }
+}
+
+/* Extra small screens tweaks */
+@media (max-width:420px){
+  #three-dot-container{
+    bottom: 14px;
+    left: 12px;
+  }
+  .three-dot-btn{
+    width:52px;
+    height:52px;
+    font-size:18px;
+  }
+  .three-dot-dropdown{
+    bottom: calc(100% + 6px);
+    min-width:160px;
+  }
+}
+
+/* Note: if you have a chat-button at bottom-right, this keeps three-dot at bottom-left to avoid overlap. */
+
+/* ====================================================
+   === HIDE THREE-DOT WHEN PRIVATE MESSENGER IS OPEN
+   ==================================================== */
+
+/* Preferred / reliable approach: have your JS toggle a class on <body> when messenger opens:
+     document.body.classList.add('pm-open') // when opened
+     document.body.classList.remove('pm-open') // when closed
+   The rule below will hide the three-dot container when that class is present.
+*/
+body.pm-open #three-dot-container{
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  transform: translateY(6px) !important;
+}
+
+/* Progressive enhancement: for browsers that support :has(), hide three-dot if panel exists & visible */
+@supports (selector(:has(*))) {
+  body:has(.private-messenger-panel:not([hidden])) #three-dot-container,
+  body:has(.private-messenger-panel[aria-hidden="false"]) #three-dot-container {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    transform: translateY(6px) !important;
+  }
+}
+
+/* Extra fallback: attempt to hide when the panel is a sibling (may not match in many DOM structures,
+   but won't hurt if present). Kept as a last resort. */
+.private-messenger-panel:not([hidden]) ~ #three-dot-container,
+.private-messenger-panel[aria-hidden="false"] ~ #three-dot-container{
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  transform: translateY(6px) !important;
+}
+
+/* Also hide the dropdown if somehow it's open when messenger is opened */
+body.pm-open .three-dot-dropdown,
+body:has(.private-messenger-panel:not([hidden])) .three-dot-dropdown{
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* End CSS */
+
+/* ============================
+   ADDITIONAL UPDATES — CONTACT ID VISIBILITY + SEND GUARD
+   ============================ */
+
+/* Show ID clearly next to name in PM contact "card" */
+.pm-user-btn { 
+  /* default: column (avatar over name). We'll adapt at larger widths below) */
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+/* style the id chip for PM contacts */
+.pm-user-id {
+  display: block;
+  font-size: 12px;
+  color: var(--pm-muted);
+  background: transparent;
+  padding: 2px 6px;
+  border-radius: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* On wider screens show name + id inline for compact visibility */
+@media (min-width: 720px) {
+  .pm-user-btn {
+    flex-direction: row;        /* name and id on same row */
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+    min-width: 140px;
+  }
+  .pm-user-name{
+    font-size:13px;
+    font-weight:800;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pm-user-id{ font-size:12px; color:var(--pm-muted); margin-left:4px; flex-shrink:0; }
+}
+
+/* Ensure active-users rows keep id visible and truncated nicely */
+.au-item { gap: 8px; align-items: center; }
+.au-item-id { font-size:12px; color:var(--muted); flex-shrink:0; }
+
+/* Highlight currently-logged-in user in contacts (optional: JS can set data-current="true") */
+.pm-user-item[data-current="true"] .pm-user-btn,
+.au-item[data-current="true"] {
+  box-shadow: 0 8px 20px rgba(124,58,237,0.08);
+  border-color: rgba(124,58,237,0.14);
+}
+
+/* ======= Prevent rapid double-click / multiple-send visual guard ====== */
+/* When JS marks the form as sending (add class .sending), visually disable inputs */
+.pm-chat-form.sending input,
+.pm-chat-form.sending button {
+  pointer-events: none;
+  opacity: 0.6;
+  filter: saturate(0.96);
+}
+
+/* Also disable send button when actually disabled (for accessibility) */
+.pm-chat-form button[disabled] {
+  pointer-events: none;
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Small UX: show a small "sending…" indicator if needed (JS can inject) */
+.pm-sending-indicator {
+  font-size:12px;
+  color:var(--pm-muted);
+  margin-left:8px;
+  display:inline-block;
+}
+
+/* Focus / keyboard friendliness for the new id chip (so screen-reader users can reach it) */
+.pm-user-id:focus { outline: 2px solid rgba(14,165,233,0.16); outline-offset: 3px; border-radius:6px }
+
+/* Slight spacing polish for horizontal contact list to ensure ID doesn't wrap awkwardly */
+.pm-user-btn .pm-user-name,
+.pm-user-btn .pm-user-id { max-width: calc(100% - 10px); }
+
+/* End additions */

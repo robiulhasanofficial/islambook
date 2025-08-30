@@ -20,6 +20,12 @@
     try{ socket.emit('request_contacts'); }catch(_){}
   });
 
+  // ------------------ small client-side sets/maps to avoid duplicate UI appends/sends ------------------
+  const displayedChatMessageIds = new Set();
+  const displayedPrivateMessageIds = new Set();
+  const pendingPrivateSends = new Map(); // messageId -> timeoutId
+  const ACK_TIMEOUT = 8000; // ms
+
   // ------------------ Active Users widget (NEW) ------------------
   // Elements
   const auToggle = document.getElementById('active-users-toggle');
@@ -46,18 +52,46 @@
       const node = auTemplate.content.cloneNode(true);
       const li = node.querySelector('.au-item');
       li.dataset.userId = u.userId;
+      // Build inner left area with name + ID and a message button to open PM
       const nameEl = li.querySelector('.au-item-name');
       const idEl = li.querySelector('.au-item-id');
       nameEl.textContent = u.userName || 'Anonymous';
       idEl.textContent = u.userId;
-      // clicking a user copies their id
-      li.addEventListener('click', async ()=> {
-        try{ await navigator.clipboard.writeText(u.userId); // small UI feedback
+
+      // Remove the default whole-li click copy behavior and replace with:
+      // left-click name => copy id (quick), message icon => open private chat
+      li.addEventListener('click', async (evt)=> {
+        // if clicking the message button (we'll check class), skip copy
+        if(evt.target && (evt.target.closest && evt.target.closest('.au-msg-btn'))) return;
+        try{ await navigator.clipboard.writeText(u.userId);
           const old = idEl.textContent;
           idEl.textContent = 'Copied!';
           setTimeout(()=> idEl.textContent = old, 900);
         }catch(e){ alert('Copy failed: '+u.userId); }
       });
+
+      // add a small message button on each row to open private messenger directly
+      const msgBtn = document.createElement('button');
+      msgBtn.type = 'button';
+      msgBtn.className = 'au-msg-btn';
+      msgBtn.title = `Message ${u.userName || u.userId}`;
+      msgBtn.style.border = '0';
+      msgBtn.style.background = 'transparent';
+      msgBtn.style.cursor = 'pointer';
+      msgBtn.style.fontWeight = '800';
+      msgBtn.style.color = 'var(--muted)';
+      msgBtn.textContent = '✉';
+      // click opens private messenger and then conversation
+      msgBtn.addEventListener('click', (ev)=>{
+        ev.stopPropagation();
+        openPrivateMessenger().then(()=> openConversationWith(u.userId, u.userName||u.userId)).catch(()=>{/*ignore*/});
+        // close active-users panel to avoid overlap
+        closeAuPanel();
+      });
+
+      // append msgBtn to li (on the right)
+      li.appendChild(msgBtn);
+
       auUl.appendChild(li);
     });
 
@@ -389,9 +423,15 @@
 
   socket.on('message', async (msg)=>{ // single new message from server (global chat)
     try{
+      if(!msg || !msg.id) return;
       if(!(await existsMessageInDB(msg.id))){
         await saveMessageToDB(msg);
         if(chatPanelOpen) appendMessageToUI(msg); else incrementUnreadBadge();
+      } else {
+        // avoid duplicate UI append
+        if(!displayedChatMessageIds.has(msg.id)){
+          if(chatPanelOpen) appendMessageToUI(msg); else incrementUnreadBadge();
+        }
       }
     }catch(e){ console.error(e); }
   });
@@ -491,6 +531,10 @@
   }
 
   function appendMessageToUI(msg){
+    if(!msg || !msg.id) return;
+    if(displayedChatMessageIds.has(msg.id)) return;
+    displayedChatMessageIds.add(msg.id);
+
     const div = document.createElement('div');
     div.className = 'chat-msg';
     const when = new Date(msg.created_at).toLocaleTimeString();
@@ -576,6 +620,7 @@
   // open/close private messenger functions
   async function openPrivateMessenger(){
     privateMessengerPanel.removeAttribute('hidden'); privateMessengerPanel.setAttribute('aria-hidden','false'); privateMessengerPanel.classList.add('open'); privateMessengerOpen = true;
+    document.body.classList.add('pm-open'); // css hides three-dot etc.
     // populate contacts
     await renderPMContacts();
     // focus first contact or back
@@ -584,6 +629,7 @@
   }
   function closePrivateMessenger(){
     privateMessengerPanel.setAttribute('hidden',''); privateMessengerPanel.setAttribute('aria-hidden','true'); privateMessengerPanel.classList.remove('open'); privateMessengerOpen = false;
+    document.body.classList.remove('pm-open');
     selectedPMUserId = null; selectedPMUserName = null;
     pmChatArea.setAttribute('hidden','');
   }
@@ -661,7 +707,9 @@
       const btn = node.querySelector('.pm-user-btn');
       btn.dataset.userId = c.userId;
       const nameEl = node.querySelector('.pm-user-name');
+      const idSpan = node.querySelector('.pm-user-id');
       nameEl.textContent = c.userName || c.userId;
+      if(idSpan) idSpan.textContent = c.userId; // show id next to name
       // badge for unread
       if(c.unread && c.unread>0){
         const span = document.createElement('span');
@@ -702,6 +750,14 @@
   }
 
   function appendPrivateMessageToUI(msg, otherId){
+    if(!msg || !msg.id) return;
+    if(displayedPrivateMessageIds.has(msg.id)) return;
+    // Only append if this message involves current user (safety)
+    if(!(msg.fromId === currentUserId || msg.toId === currentUserId || msg.userId === currentUserId || msg.fromId === otherId || msg.toId === otherId)) {
+      return;
+    }
+    displayedPrivateMessageIds.add(msg.id);
+
     const div = document.createElement('div');
     const isSent = (msg.fromId === currentUserId) || (msg.userId === currentUserId && (!msg.toId || msg.toId));
     div.className = 'pm-msg' + (isSent ? ' sent' : '');
@@ -732,8 +788,9 @@
   }
 
   // send private messages
-  pmChatForm.addEventListener('submit', async (e)=>{ e.preventDefault(); const text = (pmChatInput.value||'').trim(); if(!text || !selectedPMUserId) return; await sendPrivateMessageTo(selectedPMUserId, text); pmChatInput.value=''; });
-  pmSendBtn.addEventListener('click', async ()=>{ const text = (pmChatInput.value||'').trim(); if(!text || !selectedPMUserId) return; await sendPrivateMessageTo(selectedPMUserId, text); pmChatInput.value=''; });
+  // guard: avoid duplicate submit if form already in sending state
+  pmChatForm.addEventListener('submit', async (e)=>{ e.preventDefault(); if(pmChatForm.classList.contains('sending')) return; const text = (pmChatInput.value||'').trim(); if(!text || !selectedPMUserId) return; await sendPrivateMessageTo(selectedPMUserId, text); pmChatInput.value=''; });
+  pmSendBtn.addEventListener('click', async ()=>{ if(pmChatForm.classList.contains('sending')) return; const text = (pmChatInput.value||'').trim(); if(!text || !selectedPMUserId) return; await sendPrivateMessageTo(selectedPMUserId, text); pmChatInput.value=''; });
 
   async function sendPrivateMessageTo(otherId, text){
     const msg = {
@@ -746,13 +803,55 @@
       created_at: timeNow()
     };
     try{
-      // save locally
+      // save locally first
       await saveMessageToDB(msg);
       // append immediately if chatting with same user
       if(selectedPMUserId === otherId) appendPrivateMessageToUI(msg, otherId);
-      // emit to server (server must deliver only to recipient + sender)
-      socket.emit('private_message', msg);
-    }catch(e){ console.error('private send failed', e); alert('Failed to send private message'); }
+      // set UI sending guard
+      pmChatForm.classList.add('sending');
+      pmSendBtn.disabled = true;
+      pmChatInput.disabled = true;
+
+      // set timeout fallback
+      const t = setTimeout(()=>{
+        pendingPrivateSends.delete(msg.id);
+        pmChatForm.classList.remove('sending');
+        pmSendBtn.disabled = false;
+        pmChatInput.disabled = false;
+        // note: we don't auto-resend, just re-enable UI; user can retry if needed
+        console.warn('[PM] ack timeout for', msg.id);
+      }, ACK_TIMEOUT);
+      pendingPrivateSends.set(msg.id, t);
+
+      // emit to server with optional ack callback (server may implement ack)
+      try{
+        socket.emit('private_message', msg, (ack)=>{
+          // if server calls ack, clear pending and re-enable UI
+          const timeoutId = pendingPrivateSends.get(msg.id);
+          if(timeoutId) clearTimeout(timeoutId);
+          pendingPrivateSends.delete(msg.id);
+          pmChatForm.classList.remove('sending');
+          pmSendBtn.disabled = false;
+          pmChatInput.disabled = false;
+          // optionally update message status UI if ack contains status
+          if(ack && ack.ok) {
+            // success — nothing more needed client-side for now
+          } else {
+            console.warn('[PM] server ack returned falsy for', msg.id, ack);
+          }
+        });
+      }catch(e){
+        // If emit throws (rare), clear timeout and re-enable
+        const timeoutId = pendingPrivateSends.get(msg.id);
+        if(timeoutId) clearTimeout(timeoutId);
+        pendingPrivateSends.delete(msg.id);
+        pmChatForm.classList.remove('sending');
+        pmSendBtn.disabled = false;
+        pmChatInput.disabled = false;
+        console.error('[PM] emit failed', e);
+      }
+
+    }catch(e){ console.error('private send failed', e); alert('Failed to send private message'); pmChatForm.classList.remove('sending'); pmSendBtn.disabled = false; pmChatInput.disabled = false; }
   }
 
   // handle incoming private_message
@@ -760,22 +859,32 @@
     try{
       // basic shaping: ensure fields present
       if(!msg || !msg.id) return;
-      // save if new
-      if(!(await existsMessageInDB(msg.id))){
+      // SECURITY: ignore messages not addressed to or from this client (client-side check).
+      // NOTE: server must also enforce this — client check is just additional safety.
+      if(!(msg.toId === currentUserId || msg.fromId === currentUserId)) {
+        // not for us; ignore
+        return;
+      }
+
+      const alreadyExists = await existsMessageInDB(msg.id);
+      if(!alreadyExists){
         await saveMessageToDB(msg);
       }
-      // if pm panel open and selected matches, append to UI
-      const otherId = (msg.fromId === currentUserId) ? msg.toId : msg.fromId;
-      if(privateMessengerOpen && selectedPMUserId && (msg.fromId === selectedPMUserId || msg.toId === selectedPMUserId)){
-        appendPrivateMessageToUI(msg, selectedPMUserId);
-        pmChatMessages.scrollTop = pmChatMessages.scrollHeight;
+
+      // Avoid duplicate append: only append if we haven't displayed this message id yet.
+      const isRelevantToOpenConversation = privateMessengerOpen && selectedPMUserId && (msg.fromId === selectedPMUserId || msg.toId === selectedPMUserId);
+      if(isRelevantToOpenConversation){
+        if(!displayedPrivateMessageIds.has(msg.id)){
+          appendPrivateMessageToUI(msg, selectedPMUserId);
+          pmChatMessages.scrollTop = pmChatMessages.scrollHeight;
+        }
       } else {
-        // mark unread badge on contact (if exists), otherwise we will show it when rendering contacts
-        const btn = Array.from(pmUserList.querySelectorAll('button')).find(b=> b.dataset.userId === (msg.fromId === currentUserId ? msg.toId : msg.fromId));
+        // mark unread badge on contact (if exists), otherwise it will show when rendering contacts
+        const partnerId = (msg.fromId === currentUserId) ? msg.toId : msg.fromId;
+        const btn = Array.from(pmUserList.querySelectorAll('button')).find(b=> b.dataset.userId === partnerId);
         if(btn){
           let badge = btn.querySelector('.pm-unread-badge');
           if(badge){
-            // increment numeric value if possible
             const v = parseInt(badge.textContent||'0',10) || 0;
             badge.textContent = v+1;
           } else {
@@ -815,8 +924,7 @@
   // close messenger on outside click (defensive)
   document.addEventListener('click', (e)=> {
     if(privateMessengerOpen && privateMessengerPanel && !privateMessengerPanel.contains(e.target) && !threeDotToggle.contains(e.target) && !openPrivateBtn.contains(e.target)){
-      // don't auto-close if clicking inside dropdown area etc.
-      // optional: keep open; for now do nothing (user should manually close)
+      // optional: do nothing to avoid accidental closes
     }
   });
 
