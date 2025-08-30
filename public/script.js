@@ -7,11 +7,8 @@
   let currentUserId = localStorage.getItem("mini_user_id");
   if (!currentUser) { currentUser = prompt("আপনার নাম লিখুন:")?.trim() || "Anonymous"; localStorage.setItem("mini_user_name", currentUser); }
   if (!currentUserId) { const raw = (crypto && crypto.randomUUID) ? crypto.randomUUID() : ('id-' + Date.now() + '-' + Math.random().toString(36).slice(2)); const suffix = raw.replace(/-/g,'').slice(0,6); const cleanName = currentUser.replace(/\s+/g,'').slice(0,12) || 'User'; currentUserId = `${cleanName}#${suffix}`; localStorage.setItem("mini_user_id", currentUserId); }
-  const idBadgeEl = document.getElementById('idBadge');
-  if(idBadgeEl) {
-    idBadgeEl.textContent = `You: ${currentUserId}`;
-    idBadgeEl.addEventListener('click', ()=>{ navigator.clipboard?.writeText(currentUserId).then(()=>{ const b = document.getElementById('idBadge'); const prev = b.textContent; b.textContent='Copied!'; setTimeout(()=> b.textContent = `You: ${currentUserId}`,900); }).catch(()=>alert('Copy failed — your ID: '+currentUserId)); });
-  }
+  document.getElementById('idBadge').textContent = `You: ${currentUserId}`;
+  document.getElementById('idBadge').addEventListener('click', ()=>{ navigator.clipboard?.writeText(currentUserId).then(()=>{ const b = document.getElementById('idBadge'); const prev = b.textContent; b.textContent='Copied!'; setTimeout(()=> b.textContent = `You: ${currentUserId}`,900); }).catch(()=>alert('Copy failed — your ID: '+currentUserId)); });
 
   // ------------------ Socket.IO connection ------------------
   const socket = io("https://islambook.onrender.com", { transports: ['websocket','polling'] });
@@ -20,14 +17,8 @@
     socket.emit('im_here', { userId: currentUserId, userName: currentUser });
     socket.emit('request_active_users');
     // optional request for contacts (server may respond with 'contacts')
-    try{ socket.emit('request_contacts'); }catch(_){ }
+    try{ socket.emit('request_contacts'); }catch(_){}
   });
-
-  // ------------------ small client-side sets/maps to avoid duplicate UI appends/sends ------------------
-  const displayedChatMessageIds = new Set();
-  const displayedPrivateMessageIds = new Set();
-  const pendingPrivateSends = new Map(); // messageId -> timeoutId
-  const ACK_TIMEOUT = 8000; // ms
 
   // ------------------ Active Users widget (NEW) ------------------
   // Elements
@@ -42,10 +33,9 @@
 
   // Internal state
   const activeUsers = new Map(); // userId -> {userId, userName, lastSeen, socketId}
-  function setActiveCount(n){ if(auCountEl) auCountEl.textContent = String(n || 0); if(auToggle) auToggle.setAttribute('aria-expanded', String(Boolean(auListPanel && !auListPanel.hasAttribute('hidden')))); }
+  function setActiveCount(n){ auCountEl.textContent = String(n || 0); auToggle.setAttribute('aria-expanded', String(Boolean(auListPanel && !auListPanel.hasAttribute('hidden')))); }
 
   function renderActiveUsers(){
-    if(!auUl) return;
     // clear list
     auUl.innerHTML = '';
     if(activeUsers.size === 0){ const li = document.createElement('li'); li.className = 'au-empty'; li.textContent = 'কেউ অনলাইন নেই'; auUl.appendChild(li); setActiveCount(0); return; }
@@ -53,69 +43,37 @@
     // sort by lastSeen desc (most recent first)
     const arr = Array.from(activeUsers.values()).sort((a,b)=> (b.lastSeen||0) - (a.lastSeen||0));
     arr.forEach(u => {
-      const node = auTemplate ? auTemplate.content.cloneNode(true) : null;
-      let li;
-      if(node){
-        li = node.querySelector('.au-item');
-      } else {
-        li = document.createElement('li');
-        li.className = 'au-item';
-      }
+      const node = auTemplate.content.cloneNode(true);
+      const li = node.querySelector('.au-item');
       li.dataset.userId = u.userId;
-      // Build inner left area with name + ID and a message button to open PM
-      const nameEl = li.querySelector('.au-item-name') || document.createElement('span');
-      const idEl = li.querySelector('.au-item-id') || document.createElement('small');
+      const nameEl = li.querySelector('.au-item-name');
+      const idEl = li.querySelector('.au-item-id');
       nameEl.textContent = u.userName || 'Anonymous';
       idEl.textContent = u.userId;
-
-      // Remove the default whole-li click copy behavior and replace with:
-      li.addEventListener('click', async (evt)=> {
-        if(evt.target && (evt.target.closest && evt.target.closest('.au-msg-btn'))) return;
-        try{ await navigator.clipboard.writeText(u.userId);
+      // clicking a user copies their id
+      li.addEventListener('click', async ()=> {
+        try{ await navigator.clipboard.writeText(u.userId); // small UI feedback
           const old = idEl.textContent;
           idEl.textContent = 'Copied!';
           setTimeout(()=> idEl.textContent = old, 900);
         }catch(e){ alert('Copy failed: '+u.userId); }
       });
-
-      // add a small message button on each row to open private messenger directly
-      const msgBtn = document.createElement('button');
-      msgBtn.type = 'button';
-      msgBtn.className = 'au-msg-btn';
-      msgBtn.title = `Message ${u.userName || u.userId}`;
-      msgBtn.style.border = '0';
-      msgBtn.style.background = 'transparent';
-      msgBtn.style.cursor = 'pointer';
-      msgBtn.style.fontWeight = '800';
-      msgBtn.style.color = 'var(--muted)';
-      msgBtn.textContent = '✉';
-      // click opens private messenger and then conversation
-      msgBtn.addEventListener('click', (ev)=>{
-        ev.stopPropagation();
-        openPrivateMessenger().then(()=> openConversationWith(u.userId, u.userName||u.userId)).catch(()=>{/*ignore*/});
-        // close active-users panel to avoid overlap
-        closeAuPanel();
-      });
-
-      // append msgBtn to li (on the right) — ensure not to duplicate
-      if(!li.querySelector('.au-msg-btn')) li.appendChild(msgBtn);
-
       auUl.appendChild(li);
     });
 
     setActiveCount(activeUsers.size);
   }
 
-  function openAuPanel(){ if(auListPanel){ auListPanel.removeAttribute('hidden'); auListPanel.setAttribute('aria-hidden','false'); auToggle.setAttribute('aria-expanded','true'); auListPanel.classList.add('open'); auCloseBtn && auCloseBtn.focus(); } }
-  function closeAuPanel(){ if(auListPanel){ auListPanel.setAttribute('hidden',''); auListPanel.setAttribute('aria-hidden','true'); auToggle.setAttribute('aria-expanded','false'); auListPanel.classList.remove('open'); } }
-  function toggleAuPanel(){ if(!auListPanel) return; if(auListPanel.hasAttribute('hidden')) openAuPanel(); else closeAuPanel(); }
+  function openAuPanel(){ auListPanel.removeAttribute('hidden'); auListPanel.setAttribute('aria-hidden','false'); auToggle.setAttribute('aria-expanded','true'); auListPanel.classList.add('open'); auCloseBtn.focus(); }
+  function closeAuPanel(){ auListPanel.setAttribute('hidden',''); auListPanel.setAttribute('aria-hidden','true'); auToggle.setAttribute('aria-expanded','false'); auListPanel.classList.remove('open'); }
+  function toggleAuPanel(){ if(auListPanel.hasAttribute('hidden')) openAuPanel(); else closeAuPanel(); }
 
   // toggle events
-  if(auToggle) auToggle.addEventListener('click', (e)=>{ e.stopPropagation(); toggleAuPanel(); });
-  if(auCloseBtn) auCloseBtn.addEventListener('click', (e)=>{ e.stopPropagation(); closeAuPanel(); });
+  auToggle.addEventListener('click', (e)=>{ e.stopPropagation(); toggleAuPanel(); });
+  auCloseBtn.addEventListener('click', (e)=>{ e.stopPropagation(); closeAuPanel(); });
 
   // copy list
-  if(auCopyBtn) auCopyBtn.addEventListener('click', async ()=> {
+  auCopyBtn.addEventListener('click', async ()=> {
     if(activeUsers.size===0) return alert('No active users to copy');
     const lines = Array.from(activeUsers.values()).map(u=>`${u.userName||'Anon'} \t ${u.userId}`);
     const payload = lines.join('\n');
@@ -123,10 +81,10 @@
   });
 
   // refresh -> request server for active list
-  if(auRefreshBtn) auRefreshBtn.addEventListener('click', ()=>{ socket.emit('request_active_users'); auRefreshBtn.textContent = '...'; setTimeout(()=> auRefreshBtn.textContent = 'রিফ্রেশ', 800); });
+  auRefreshBtn.addEventListener('click', ()=>{ socket.emit('request_active_users'); auRefreshBtn.textContent = '...'; setTimeout(()=> auRefreshBtn.textContent = 'রিফ্রেশ', 800); });
 
   // close panel when clicking outside
-  document.addEventListener('click', (e)=>{ if(auListPanel && auToggle && !auListPanel.contains(e.target) && !auToggle.contains(e.target)){ closeAuPanel(); } });
+  document.addEventListener('click', (e)=>{ if(!auListPanel.contains(e.target) && !auToggle.contains(e.target)){ closeAuPanel(); } });
 
   // ------------------ presence helpers & socket integration ------------------
   function markUserActive(u){ if(!u || !u.userId) return; const now = Date.now(); const prev = activeUsers.get(u.userId) || {}; activeUsers.set(u.userId, { userId: u.userId, userName: u.userName||u.name||'Anonymous', lastSeen: now, socketId: u.socketId||prev.socketId || null }); }
@@ -279,7 +237,6 @@
   const feedEl = document.getElementById('feed'); const searchInput = document.getElementById('searchInput'); const searchBtn = document.getElementById('searchBtn'); const clearSearch = document.getElementById('clearSearch'); const searchInfo = document.getElementById('searchInfo');
 
   function renderComments(container, comments){
-    if(!container) return;
     container.innerHTML = '';
     if(!comments || comments.length === 0){
       container.innerHTML = "<div style='opacity:0.75'>কোনো কমেন্ট নেই</div>";
@@ -357,72 +314,19 @@
     return el;
   }
 
-  function prependPostToFeed(post){ const existing = document.getElementById('post-'+post.id); if(existing) existing.remove(); const el = createPostElement(post); feedEl && feedEl.insertAdjacentElement('afterbegin', el); }
+  function prependPostToFeed(post){ const existing = document.getElementById('post-'+post.id); if(existing) existing.remove(); const el = createPostElement(post); feedEl.insertAdjacentElement('afterbegin', el); }
   function refreshPostInDOM(postId, post){ const container = document.getElementById('post-'+postId); if(!container) return; const newEl = createPostElement(post); container.replaceWith(newEl); }
 
-  async function loadAndRenderFeed(filter=null, opts={partial:true,profile:false}){ const posts = await getAllPostsFromDB(); let shown = posts; if(filter){ const q = filter.toLowerCase(); if(opts.partial) shown = posts.filter(p=>((p.userId||'').toLowerCase().includes(q) || (p.userName||'').toLowerCase().includes(q))); else shown = posts.filter(p=>((p.userId||'').toLowerCase()===q || (p.userName||'').toLowerCase()===q)); searchInfo.style.display='block'; searchInfo.innerHTML = opts.profile? `Profile: <strong>${escapeHtml(filter)}</strong> — ${shown.length} post(s)` : `Search: <strong>${escapeHtml(filter)}</strong> — ${shown.length} result(s)`; } else { if(searchInfo) { searchInfo.style.display='none'; searchInfo.textContent=''; } }
-    if(!feedEl) return;
-    feedEl.innerHTML=''; if(shown.length===0){ feedEl.innerHTML=`<div style="padding:20px;color:var(--muted)">No posts found${filter? ' for '+escapeHtml(filter):''}.</div>`; await updateTotalsFromDB(); return; } shown.forEach(p=>feedEl.appendChild(createPostElement(p))); await updateTotalsFromDB(); }
+  async function loadAndRenderFeed(filter=null, opts={partial:true,profile:false}){ const posts = await getAllPostsFromDB(); let shown = posts; if(filter){ const q = filter.toLowerCase(); if(opts.partial) shown = posts.filter(p=>((p.userId||'').toLowerCase().includes(q) || (p.userName||'').toLowerCase().includes(q))); else shown = posts.filter(p=>((p.userId||'').toLowerCase()===q || (p.userName||'').toLowerCase()===q)); searchInfo.style.display='block'; searchInfo.innerHTML = opts.profile? `Profile: <strong>${escapeHtml(filter)}</strong> — ${shown.length} post(s)` : `Search: <strong>${escapeHtml(filter)}</strong> — ${shown.length} result(s)`; } else { searchInfo.style.display='none'; searchInfo.textContent=''; }
+    feedEl.innerHTML=''; if(shown.length===0){ feedEl.innerHTML=`<div style="padding:20px;color:var(--muted)">No posts found${filter? ' for '+escapeHtml(filter):''}.</div>`; return; } shown.forEach(p=>feedEl.appendChild(createPostElement(p))); }
 
-  window.clearAndShowAll = async function(){ if(searchInput) searchInput.value=''; await loadAndRenderFeed(); };
-
-  // ---------- Totals logic: compute total posts and total likes (only count likes on current user's posts) ----------
-  function countLikesForPost(p){
-    if(Array.isArray(p.likes)) return p.likes.length;
-    if(typeof p.likes === 'number') return Number(p.likes) || 0;
-    if(p.likes && typeof p.likes === 'object' && p.likes.count) return Number(p.likes.count) || 0;
-    return 0;
-  }
-
-  async function computeTotals(){
-    try{
-      const posts = await getAllPostsFromDB();
-      const totalPosts = posts.length || 0;
-
-      // Count ONLY likes that belong to posts created by the current user
-      let totalLikesForMyPosts = 0;
-      for(const p of posts){
-        if(p.userId === currentUserId){
-          totalLikesForMyPosts += countLikesForPost(p);
-        }
-      }
-
-      // return structured object so we can extend later if needed
-      return { totalPosts, totalLikesForMyPosts };
-    }catch(e){
-      console.error('[totals] compute failed', e);
-      return { totalPosts:0, totalLikesForMyPosts:0 };
-    }
-  }
-
-  async function updateTotalsFromDB(){
-    const totalsBar = document.getElementById('totalsBar');
-    const totalLikesEl = document.getElementById('totalLikes');
-    const totalPostsEl = document.getElementById('totalPosts');
-    const likesBlock = document.querySelector('.total-likes');
-    if(!totalLikesEl || !totalPostsEl) return;
-
-    const { totalPosts, totalLikesForMyPosts } = await computeTotals();
-
-    totalPostsEl.textContent = String(totalPosts);
-    // IMPORTANT: show ONLY likes on *your* posts
-    totalLikesEl.textContent = String(totalLikesForMyPosts);
-    // optionally set a tooltip so it's clear to the user what this number represents
-    totalLikesEl.title = 'আপনার পোস্টগুলোর মোট লাইক';
-
-    // threshold check (keeps your previous golden logic; threshold still applies to your-post-likes)
-    const threshold = totalsBar && totalsBar.dataset && parseInt(totalsBar.dataset.likesThreshold, 10) ? parseInt(totalsBar.dataset.likesThreshold, 10) : 20;
-    if(likesBlock){
-      if(totalLikesForMyPosts >= threshold) likesBlock.classList.add('golden'); else likesBlock.classList.remove('golden');
-    }
-  }
+  window.clearAndShowAll = async function(){ searchInput.value=''; await loadAndRenderFeed(); };
 
   // ---------- Socket handlers (keep existing emit/listen) ----------
-  socket.on('sync', async (posts)=>{ for(const p of posts||[]){ try{ if(!(await existsInDB(p.id))) await savePostToDB(p); }catch(e){} } await loadAndRenderFeed(); await updateTotalsFromDB(); });
-  socket.on('post', async (post)=>{ if(!post) return; if(await existsInDB(post.id)) return; await savePostToDB(post); prependPostToFeed(post); await updateTotalsFromDB(); });
-  socket.on('like', async (payload)=>{ try{ const db = await openDB(); const tx = db.transaction(STORE,'readwrite'); const store = tx.objectStore(STORE); const req = store.get(payload.postId); req.onsuccess = async ()=>{ const post = req.result; if(!post) return; post.likes = post.likes||[]; if(payload.action==='like'){ if(!post.likes.find(l=>l.id===payload.likeId||l.userId===payload.userId)) post.likes.push({id:payload.likeId,userId:payload.userId,userName:payload.userName||null,created_at:payload.created_at}); } else { post.likes = post.likes.filter(l=>l.id!==payload.likeId&&l.userId!==payload.userId); } await updatePostInDB(post); refreshPostInDOM(post.id,post); await updateTotalsFromDB(); }; }catch(e){console.error(e);} });
-  socket.on('comment', async (payload)=>{ try{ const db = await openDB(); const tx = db.transaction(STORE,'readwrite'); const store = tx.objectStore(STORE); const req = store.get(payload.postId); req.onsuccess = async ()=>{ const post = req.result; if(!post) return; post.comments = post.comments||[]; if(!post.comments.find(c=>c.id===payload.comment.id)){ post.comments.unshift(payload.comment); await updatePostInDB(post); refreshPostInDOM(post.id,post); } }; // comments don't change totals (but safe to refresh)
-    await updateTotalsFromDB(); }catch(e){console.error(e);} });
+  socket.on('sync', async (posts)=>{ for(const p of posts||[]){ try{ if(!(await existsInDB(p.id))) await savePostToDB(p); }catch(e){} } await loadAndRenderFeed(); });
+  socket.on('post', async (post)=>{ if(!post) return; if(await existsInDB(post.id)) return; await savePostToDB(post); prependPostToFeed(post); });
+  socket.on('like', async (payload)=>{ try{ const db = await openDB(); const tx = db.transaction(STORE,'readwrite'); const store = tx.objectStore(STORE); const req = store.get(payload.postId); req.onsuccess = async ()=>{ const post = req.result; if(!post) return; post.likes = post.likes||[]; if(payload.action==='like'){ if(!post.likes.find(l=>l.id===payload.likeId||l.userId===payload.userId)) post.likes.push({id:payload.likeId,userId:payload.userId,userName:payload.userName||null,created_at:payload.created_at}); } else { post.likes = post.likes.filter(l=>l.id!==payload.likeId&&l.userId!==payload.userId); } await updatePostInDB(post); refreshPostInDOM(post.id,post); }; }catch(e){console.error(e);} });
+  socket.on('comment', async (payload)=>{ try{ const db = await openDB(); const tx = db.transaction(STORE,'readwrite'); const store = tx.objectStore(STORE); const req = store.get(payload.postId); req.onsuccess = async ()=>{ const post = req.result; if(!post) return; post.comments = post.comments||[]; if(!post.comments.find(c=>c.id===payload.comment.id)){ post.comments.unshift(payload.comment); await updatePostInDB(post); refreshPostInDOM(post.id,post); } }; }catch(e){console.error(e);} });
 
   // NEW: respond to server's request to announce local posts (metadata only)
   socket.on('please_announce_posts', async ()=> {
@@ -446,8 +350,8 @@
             const post = req.result;
             if(post){
               // prefer 'upload_full_post' (new protocol); also emit 'new_post' for backward compatibility
-              try{ socket.emit('upload_full_post', post); }catch(_){ }
-              try{ socket.emit('new_post', post); }catch(_){ }
+              try{ socket.emit('upload_full_post', post); }catch(_){}
+              try{ socket.emit('new_post', post); }catch(_){}
             }
           };
         }catch(e){ console.error('[request_upload_posts] per-id error', e); }
@@ -471,7 +375,6 @@
         try{ if(!(await existsInDB(p.id))) await savePostToDB(p); }catch(e){}
         prependPostToFeed(p);
       }
-      await updateTotalsFromDB();
     }catch(e){ console.error('[bulk_posts] handler failed', e); }
   });
 
@@ -486,22 +389,15 @@
 
   socket.on('message', async (msg)=>{ // single new message from server (global chat)
     try{
-      if(!msg || !msg.id) return;
       if(!(await existsMessageInDB(msg.id))){
         await saveMessageToDB(msg);
         if(chatPanelOpen) appendMessageToUI(msg); else incrementUnreadBadge();
-      } else {
-        // avoid duplicate UI append
-        if(!displayedChatMessageIds.has(msg.id)){
-          if(chatPanelOpen) appendMessageToUI(msg); else incrementUnreadBadge();
-        }
       }
     }catch(e){ console.error(e); }
   });
 
   // ---------- Upload handler (uses processImageFile) ----------
-  const uploadBtn = document.getElementById('uploadBtn');
-  if(uploadBtn) uploadBtn.addEventListener('click', async (e)=>{
+  document.getElementById('uploadBtn').addEventListener('click', async (e)=>{
     e.preventDefault(); const fileInput = document.getElementById('imageInput'); const caption = document.getElementById('caption').value.trim(); const file = fileInput.files && fileInput.files[0]; if(!file) return alert('Choose an image first'); if(file.size > 20*1024*1024 && !confirm('Image is large (>20MB). Continue?')) return;
     let processedDataUrl; try{ processedDataUrl = await processImageFile(file); }catch(err){ console.error('processing failed',err); processedDataUrl = await new Promise((res,rej)=>{ const fr = new FileReader(); fr.onload = ()=> res(fr.result); fr.onerror = rej; fr.readAsDataURL(file); }); }
     const post = { id:uid(), userId:currentUserId, userName:currentUser, caption, imageData:processedDataUrl, created_at:timeNow(), likes:[], comments:[] };
@@ -510,54 +406,50 @@
     try{ socket.emit('upload_full_post', post); }catch(e){}
     // keep backward compatibility with older servers
     try{ socket.emit('new_post', post); }catch(e){}
-    if(fileInput) fileInput.value=''; const capEl = document.getElementById('caption'); if(capEl) capEl.value='';
-    // update totals
-    await updateTotalsFromDB();
-  });
+    fileInput.value=''; document.getElementById('caption').value=''; });
 
   // like/comment helpers (same as before)
-  async function toggleLike(postId, btnEl){ const userId=currentUserId; const userName=currentUser; const likeId=uid(); const db=await openDB(); const tx=db.transaction(STORE,'readwrite'); const store = tx.objectStore(STORE); const req = store.get(postId); req.onsuccess = async ()=>{ const post = req.result; if(!post) return; post.likes = post.likes||[]; const existing = post.likes.find(l=>l.userId===userId); const payload = { postId, userId, userName, likeId, action:'like', created_at:timeNow() }; if(existing){ payload.action='unlike'; payload.likeId = existing.id; post.likes = post.likes.filter(l=>l.userId!==userId); btnEl.classList.remove('liked'); } else { post.likes.push({id:likeId,userId,userName,created_at:payload.created_at}); btnEl.classList.add('liked'); } const countEl = btnEl.querySelector('.like-count'); if(countEl) countEl.textContent = post.likes.length; await updatePostInDB(post); socket.emit('like', payload); // update totals after DB change
-    await updateTotalsFromDB(); }; req.onerror = (e)=> console.error(e); }
+  async function toggleLike(postId, btnEl){ const userId=currentUserId; const userName=currentUser; const likeId=uid(); const db=await openDB(); const tx=db.transaction(STORE,'readwrite'); const store = tx.objectStore(STORE); const req = store.get(postId); req.onsuccess = async ()=>{ const post = req.result; if(!post) return; post.likes = post.likes||[]; const existing = post.likes.find(l=>l.userId===userId); const payload = { postId, userId, userName, likeId, action:'like', created_at:timeNow() }; if(existing){ payload.action='unlike'; payload.likeId = existing.id; post.likes = post.likes.filter(l=>l.userId!==userId); btnEl.classList.remove('liked'); } else { post.likes.push({id:likeId,userId,userName,created_at:payload.created_at}); btnEl.classList.add('liked'); } const countEl = btnEl.querySelector('.like-count'); if(countEl) countEl.textContent = post.likes.length; await updatePostInDB(post); socket.emit('like', payload); }; req.onerror = (e)=> console.error(e); }
   async function postComment(postId,text){ const comment = { id:uid(), userId:currentUserId, userName:currentUser, text, created_at:timeNow() }; const payload = { postId, comment }; const db = await openDB(); const tx = db.transaction(STORE,'readwrite'); const store = tx.objectStore(STORE); const req = store.get(postId); req.onsuccess = async ()=>{ const post = req.result; if(!post) return; post.comments = post.comments||[]; post.comments.unshift(comment); await updatePostInDB(post); refreshPostInDOM(postId,post); socket.emit('comment', payload); }; req.onerror = (e)=> console.error(e); }
 
   // ---------- Lightbox: zoom/pan/touch (improved UX) ----------
   const lbOverlay = document.getElementById('lightboxOverlay'); const lbInner = document.querySelector('.lightbox-inner'); const lbCanvas = document.querySelector('.lightbox-canvas'); const lbImgEl = document.getElementById('lbImg'); const lbCaptionEl = document.getElementById('lbCaption'); const btnIn = document.getElementById('zoomIn'); const btnOut = document.getElementById('zoomOut'); const btnReset = document.getElementById('resetZoom'); const btnClose = document.getElementById('closeLBox');
 
   let viewer = { scale:1, min:1, max:4, x:0, y:0, dragging:false };
-  function openLightbox(src, caption){ if(!lbImgEl) return; lbImgEl.src = src; lbImgEl.alt = caption||''; lbCaptionEl && (lbCaptionEl.textContent = caption||''); viewer.scale = 1; viewer.x=0; viewer.y=0; lbImgEl.style.transform = 'translate(0px,0px) scale(1)'; lbOverlay && lbOverlay.classList.add('open'); lbOverlay && lbOverlay.setAttribute('aria-hidden','false'); btnClose && btnClose.focus(); document.body.classList.add('lightbox-open'); }
-  function closeLightbox(){ if(lbOverlay){ lbOverlay.classList.remove('open'); lbOverlay.setAttribute('aria-hidden','true'); setTimeout(()=> lbImgEl && (lbImgEl.src=''), 300); document.body.classList.remove('lightbox-open'); } }
-  btnClose && btnClose.addEventListener('click', closeLightbox);
+  function openLightbox(src, caption){ lbImgEl.src = src; lbImgEl.alt = caption||''; lbCaptionEl.textContent = caption||''; viewer.scale = 1; viewer.x=0; viewer.y=0; lbImgEl.style.transform = 'translate(0px,0px) scale(1)'; lbOverlay.classList.add('open'); lbOverlay.setAttribute('aria-hidden','false'); btnClose.focus(); document.body.classList.add('lightbox-open'); }
+  function closeLightbox(){ lbOverlay.classList.remove('open'); lbOverlay.setAttribute('aria-hidden','true'); setTimeout(()=> lbImgEl.src='', 300); document.body.classList.remove('lightbox-open'); }
+  btnClose.addEventListener('click', closeLightbox);
 
-  function applyViewer(){ if(lbImgEl) lbImgEl.style.transform = `translate(${viewer.x}px, ${viewer.y}px) scale(${viewer.scale})`; }
-  function zoomTo(newScale, cx, cy){ if(!lbImgEl) return; const rect = lbImgEl.getBoundingClientRect(); const imgX = (cx - viewer.x) / viewer.scale; const imgY = (cy - viewer.y) / viewer.scale; viewer.x = cx - imgX * newScale; viewer.y = cy - imgY * newScale; viewer.scale = Math.max(viewer.min, Math.min(viewer.max, newScale)); applyViewer(); }
-  function zoomBy(factor){ if(!lbImgEl) return; const rect = lbImgEl.getBoundingClientRect(); zoomTo(viewer.scale * factor, rect.width/2, rect.height/2); }
-  btnIn && btnIn.addEventListener('click', ()=> zoomBy(1.25)); btnOut && btnOut.addEventListener('click', ()=> zoomBy(0.8)); btnReset && btnReset.addEventListener('click', ()=>{ viewer.scale=1; viewer.x=0; viewer.y=0; applyViewer(); });
+  function applyViewer(){ lbImgEl.style.transform = `translate(${viewer.x}px, ${viewer.y}px) scale(${viewer.scale})`; }
+  function zoomTo(newScale, cx, cy){ const rect = lbImgEl.getBoundingClientRect(); const imgX = (cx - viewer.x) / viewer.scale; const imgY = (cy - viewer.y) / viewer.scale; viewer.x = cx - imgX * newScale; viewer.y = cy - imgY * newScale; viewer.scale = Math.max(viewer.min, Math.min(viewer.max, newScale)); applyViewer(); }
+  function zoomBy(factor){ const rect = lbImgEl.getBoundingClientRect(); zoomTo(viewer.scale * factor, rect.width/2, rect.height/2); }
+  btnIn.addEventListener('click', ()=> zoomBy(1.25)); btnOut.addEventListener('click', ()=> zoomBy(0.8)); btnReset.addEventListener('click', ()=>{ viewer.scale=1; viewer.x=0; viewer.y=0; applyViewer(); });
 
   // pointer pan
   let pDown=false, pId=null, lastX=0, lastY=0;
-  lbImgEl && lbImgEl.addEventListener('pointerdown',(e)=>{ lbImgEl.setPointerCapture(e.pointerId); pDown=true; pId=e.pointerId; lastX=e.clientX; lastY=e.clientY; viewer.dragging=true; });
-  lbImgEl && lbImgEl.addEventListener('pointermove',(e)=>{ if(!pDown||e.pointerId!==pId) return; const dx = e.clientX - lastX; const dy = e.clientY - lastY; lastX=e.clientX; lastY=e.clientY; if(viewer.scale>1.01){ viewer.x += dx; viewer.y += dy; applyViewer(); } });
-  lbImgEl && lbImgEl.addEventListener('pointerup',(e)=>{ pDown=false; viewer.dragging=false; try{ lbImgEl.releasePointerCapture(e.pointerId);}catch(_){} }); lbImgEl && lbImgEl.addEventListener('pointercancel',()=>{ pDown=false; viewer.dragging=false; });
+  lbImgEl.addEventListener('pointerdown',(e)=>{ lbImgEl.setPointerCapture(e.pointerId); pDown=true; pId=e.pointerId; lastX=e.clientX; lastY=e.clientY; viewer.dragging=true; });
+  lbImgEl.addEventListener('pointermove',(e)=>{ if(!pDown||e.pointerId!==pId) return; const dx = e.clientX - lastX; const dy = e.clientY - lastY; lastX=e.clientX; lastY=e.clientY; if(viewer.scale>1.01){ viewer.x += dx; viewer.y += dy; applyViewer(); } });
+  lbImgEl.addEventListener('pointerup',(e)=>{ pDown=false; viewer.dragging=false; try{ lbImgEl.releasePointerCapture(e.pointerId);}catch(_){} }); lbImgEl.addEventListener('pointercancel',()=>{ pDown=false; viewer.dragging=false; });
 
   // double tap / dblclick
-  lbImgEl && lbImgEl.addEventListener('dblclick',(e)=>{ const rect=lbImgEl.getBoundingClientRect(); const cx=e.clientX-rect.left; const cy=e.clientY-rect.top; if(viewer.scale<=1.05) zoomTo(2.5,cx,cy); else { viewer.scale=1; viewer.x=0; viewer.y=0; applyViewer(); } });
+  lbImgEl.addEventListener('dblclick',(e)=>{ const rect=lbImgEl.getBoundingClientRect(); const cx=e.clientX-rect.left; const cy=e.clientY-rect.top; if(viewer.scale<=1.05) zoomTo(2.5,cx,cy); else { viewer.scale=1; viewer.x=0; viewer.y=0; applyViewer(); } });
 
   // wheel to zoom
-  lbImgEl && lbImgEl.addEventListener('wheel',(e)=>{ if(!lbOverlay || !lbOverlay.classList.contains('open')) return; e.preventDefault(); const dir = e.deltaY < 0 ? 1.12 : 0.88; const rect=lbImgEl.getBoundingClientRect(); const cx=e.clientX-rect.left; const cy=e.clientY-rect.top; zoomTo(viewer.scale * dir, cx, cy); }, { passive:false });
+  lbImgEl.addEventListener('wheel',(e)=>{ if(!lbOverlay.classList.contains('open')) return; e.preventDefault(); const dir = e.deltaY < 0 ? 1.12 : 0.88; const rect=lbImgEl.getBoundingClientRect(); const cx=e.clientX-rect.left; const cy=e.clientY-rect.top; zoomTo(viewer.scale * dir, cx, cy); }, { passive:false });
 
   // pinch handlers
   let pinchState={active:false, startDist:0, startScale:1, midX:0, midY:0};
-  lbImgEl && lbImgEl.addEventListener('touchstart',(e)=>{ if(e.touches.length===2){ e.preventDefault(); pinchState.active=true; pinchState.startDist=distanceBetween(e.touches[0], e.touches[1]); pinchState.startScale=viewer.scale; const rect=lbImgEl.getBoundingClientRect(); pinchState.midX = (e.touches[0].clientX + e.touches[1].clientX)/2 - rect.left; pinchState.midY = (e.touches[0].clientY + e.touches[1].clientY)/2 - rect.top; } }, {passive:false});
-  lbImgEl && lbImgEl.addEventListener('touchmove',(e)=>{ if(pinchState.active && e.touches.length===2){ e.preventDefault(); const dist = distanceBetween(e.touches[0], e.touches[1]); const factor = dist / pinchState.startDist; const target = Math.max(viewer.min, Math.min(viewer.max, pinchState.startScale * factor)); zoomTo(target, pinchState.midX, pinchState.midY); } }, {passive:false});
-  lbImgEl && lbImgEl.addEventListener('touchend',(e)=>{ if(pinchState.active && e.touches.length<2) pinchState.active=false; });
+  lbImgEl.addEventListener('touchstart',(e)=>{ if(e.touches.length===2){ e.preventDefault(); pinchState.active=true; pinchState.startDist=distanceBetween(e.touches[0], e.touches[1]); pinchState.startScale=viewer.scale; const rect=lbImgEl.getBoundingClientRect(); pinchState.midX = (e.touches[0].clientX + e.touches[1].clientX)/2 - rect.left; pinchState.midY = (e.touches[0].clientY + e.touches[1].clientY)/2 - rect.top; } }, {passive:false});
+  lbImgEl.addEventListener('touchmove',(e)=>{ if(pinchState.active && e.touches.length===2){ e.preventDefault(); const dist = distanceBetween(e.touches[0], e.touches[1]); const factor = dist / pinchState.startDist; const target = Math.max(viewer.min, Math.min(viewer.max, pinchState.startScale * factor)); zoomTo(target, pinchState.midX, pinchState.midY); } }, {passive:false});
+  lbImgEl.addEventListener('touchend',(e)=>{ if(pinchState.active && e.touches.length<2) pinchState.active=false; });
   function distanceBetween(a,b){ return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); }
 
   // keyboard navigation for accessibility
-  window.addEventListener('keydown',(e)=>{ if(!lbOverlay || !lbOverlay.classList.contains('open')) return; if(e.key==='Escape') closeLightbox(); if(e.key==='ArrowUp'){ viewer.y += 20; applyViewer(); } if(e.key==='ArrowDown'){ viewer.y -= 20; applyViewer(); } if(e.key==='ArrowLeft'){ viewer.x += 20; applyViewer(); } if(e.key==='ArrowRight'){ viewer.x +=20; applyViewer(); } });
+  window.addEventListener('keydown',(e)=>{ if(!lbOverlay.classList.contains('open')) return; if(e.key==='Escape') closeLightbox(); if(e.key==='ArrowUp'){ viewer.y += 20; applyViewer(); } if(e.key==='ArrowDown'){ viewer.y -= 20; applyViewer(); } if(e.key==='ArrowLeft'){ viewer.x += 20; applyViewer(); } if(e.key==='ArrowRight'){ viewer.x -=20; applyViewer(); } });
 
   // ---------- Search handlers ----------
-  if(searchBtn) searchBtn.addEventListener('click', async ()=>{ await loadAndRenderFeed(searchInput.value.trim()); });
-  if(searchInput) searchInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); loadAndRenderFeed(searchInput.value.trim()); } });
+  searchBtn.addEventListener('click', async ()=>{ await loadAndRenderFeed(searchInput.value.trim()); });
+  searchInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); loadAndRenderFeed(searchInput.value.trim()); } });
 
   // ---------- Global chat logic ----------
   const chatToggleBtn = document.getElementById('chatToggleBtn');
@@ -571,22 +463,22 @@
   let chatPanelOpen = false;
   let unreadCount = 0;
 
-  function showUnreadBadge(){ if(chatUnread){ if(unreadCount>0){ chatUnread.style.display='flex'; chatUnread.textContent = unreadCount>99? '99+' : String(unreadCount); } else chatUnread.style.display='none'; } }
+  function showUnreadBadge(){ if(unreadCount>0){ chatUnread.style.display='flex'; chatUnread.textContent = unreadCount>99? '99+' : String(unreadCount); } else chatUnread.style.display='none'; }
   function incrementUnreadBadge(){ unreadCount++; showUnreadBadge(); }
 
-  chatToggleBtn && chatToggleBtn.addEventListener('click', async ()=>{
+  chatToggleBtn.addEventListener('click', async ()=>{
     chatPanelOpen = !chatPanelOpen;
-    if(chatPanel) chatPanel.style.display = chatPanelOpen ? 'flex' : 'none';
+    chatPanel.style.display = chatPanelOpen ? 'flex' : 'none';
     if(chatPanelOpen){
       unreadCount = 0; showUnreadBadge();
       await loadAndRenderMessages();
-      chatInput && chatInput.focus();
+      chatInput.focus();
     }
   });
-  chatCloseBtn && chatCloseBtn.addEventListener('click', ()=>{ chatPanelOpen = false; if(chatPanel) chatPanel.style.display='none'; });
+  chatCloseBtn.addEventListener('click', ()=>{ chatPanelOpen = false; chatPanel.style.display='none'; });
 
-  chatSendBtn && chatSendBtn.addEventListener('click', ()=>{ const txt = chatInput.value.trim(); if(!txt) return; sendMessage(txt); chatInput.value=''; });
-  chatInput && chatInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); chatSendBtn.click(); } });
+  chatSendBtn.addEventListener('click', ()=>{ const txt = chatInput.value.trim(); if(!txt) return; sendMessage(txt); chatInput.value=''; });
+  chatInput.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); chatSendBtn.click(); } });
 
   async function sendMessage(text){
     const msg = { id: uid(), userId: currentUserId, userName: currentUser, text, created_at: timeNow() };
@@ -599,10 +491,6 @@
   }
 
   function appendMessageToUI(msg){
-    if(!msg || !msg.id || !chatMessagesEl) return;
-    if(displayedChatMessageIds.has(msg.id)) return;
-    displayedChatMessageIds.add(msg.id);
-
     const div = document.createElement('div');
     div.className = 'chat-msg';
     const when = new Date(msg.created_at).toLocaleTimeString();
@@ -613,7 +501,6 @@
   }
 
   async function loadAndRenderMessages(){
-    if(!chatMessagesEl) return;
     chatMessagesEl.innerHTML = '';
     try{
       const msgs = await getAllMessagesFromDB();
@@ -688,28 +575,24 @@
 
   // open/close private messenger functions
   async function openPrivateMessenger(){
-    if(!privateMessengerPanel) return;
     privateMessengerPanel.removeAttribute('hidden'); privateMessengerPanel.setAttribute('aria-hidden','false'); privateMessengerPanel.classList.add('open'); privateMessengerOpen = true;
-    document.body.classList.add('pm-open'); // css hides three-dot etc.
     // populate contacts
     await renderPMContacts();
     // focus first contact or back
-    const first = pmUserList && pmUserList.querySelector('button');
+    const first = pmUserList.querySelector('button');
     if(first) first.focus();
   }
   function closePrivateMessenger(){
-    if(!privateMessengerPanel) return;
     privateMessengerPanel.setAttribute('hidden',''); privateMessengerPanel.setAttribute('aria-hidden','true'); privateMessengerPanel.classList.remove('open'); privateMessengerOpen = false;
-    document.body.classList.remove('pm-open');
     selectedPMUserId = null; selectedPMUserName = null;
-    pmChatArea && pmChatArea.setAttribute('hidden','');
+    pmChatArea.setAttribute('hidden','');
   }
   if(pmCloseBtn) pmCloseBtn.addEventListener('click', ()=> closePrivateMessenger());
   if(pmBackBtn) pmBackBtn.addEventListener('click', ()=> { // go back to contacts list
     selectedPMUserId = null; selectedPMUserName = null;
-    pmChatArea && pmChatArea.setAttribute('hidden','');
+    pmChatArea.setAttribute('hidden','');
     // restore contacts scroll/focus
-    pmUserList && pmUserList.querySelector('button')?.focus();
+    pmUserList.querySelector('button')?.focus();
   });
   if(pmRefreshBtn) pmRefreshBtn.addEventListener('click', async ()=> { pmRefreshBtn.textContent = '...'; await renderPMContacts(); setTimeout(()=> pmRefreshBtn.textContent = '↻', 700); });
 
@@ -767,30 +650,18 @@
 
   // render contacts UI
   async function renderPMContacts(){
-    if(!pmUserList) return;
     pmUserList.innerHTML = '';
     const contacts = await gatherContacts();
     if(contacts.length===0){
       const li = document.createElement('li'); li.className = 'pm-empty'; li.textContent = 'কোনো যোগাযোগ নেই'; pmUserList.appendChild(li); return;
     }
     contacts.forEach(c=>{
-      const node = pmUserTemplate ? pmUserTemplate.content.cloneNode(true) : null;
-      let li, btn, nameEl, idSpan;
-      if(node){
-        li = node.querySelector('.pm-user-item');
-        btn = node.querySelector('.pm-user-btn');
-        nameEl = node.querySelector('.pm-user-name');
-        idSpan = node.querySelector('.pm-user-id');
-      } else {
-        li = document.createElement('li'); li.className = 'pm-user-item';
-        btn = document.createElement('button'); btn.className = 'pm-user-btn';
-        nameEl = document.createElement('span'); nameEl.className = 'pm-user-name';
-        idSpan = document.createElement('span'); idSpan.className = 'pm-user-id';
-        btn.appendChild(nameEl); btn.appendChild(idSpan); li.appendChild(btn);
-      }
+      const node = pmUserTemplate.content.cloneNode(true);
+      const li = node.querySelector('.pm-user-item');
+      const btn = node.querySelector('.pm-user-btn');
       btn.dataset.userId = c.userId;
+      const nameEl = node.querySelector('.pm-user-name');
       nameEl.textContent = c.userName || c.userId;
-      if(idSpan) idSpan.textContent = c.userId; // show id next to name
       // badge for unread
       if(c.unread && c.unread>0){
         const span = document.createElement('span');
@@ -811,17 +682,19 @@
 
   // load conversation messages (private) between currentUserId and otherId
   async function loadConversationFromDB(otherId){
-    if(!pmChatMessages) return;
     pmChatMessages.innerHTML = '';
     const msgs = await getAllMessagesFromDB();
     const convo = msgs.filter(m=>{
       const from = m.fromId || m.userId || null;
       const to = m.toId || m.to || null;
+      // consider only messages that have to/from pair
       if(from && to) return (from === currentUserId && to === otherId) || (from === otherId && to === currentUserId);
+      // fallback: if no explicit to/from, try userId == otherId or userId == currentUser and meta 'to'
       if(m.userId && m.userId === currentUserId && (m.toId === otherId || m.to === otherId)) return true;
       if(m.userId && m.userId === otherId && (m.toId === currentUserId || m.to === currentUserId)) return true;
       return false;
     });
+    // sort by created_at ascending (getAllMessagesFromDB already sorted asc)
     convo.forEach(m => {
       appendPrivateMessageToUI(m, otherId);
     });
@@ -829,14 +702,6 @@
   }
 
   function appendPrivateMessageToUI(msg, otherId){
-    if(!msg || !msg.id || !pmChatMessages) return;
-    if(displayedPrivateMessageIds.has(msg.id)) return;
-    // Only append if this message involves current user (safety)
-    if(!(msg.fromId === currentUserId || msg.toId === currentUserId || msg.userId === currentUserId || msg.fromId === otherId || msg.toId === otherId)) {
-      return;
-    }
-    displayedPrivateMessageIds.add(msg.id);
-
     const div = document.createElement('div');
     const isSent = (msg.fromId === currentUserId) || (msg.userId === currentUserId && (!msg.toId || msg.toId));
     div.className = 'pm-msg' + (isSent ? ' sent' : '');
@@ -851,25 +716,24 @@
     selectedPMUserId = otherId;
     selectedPMUserName = otherName || otherId;
     // show chat area
-    pmChatArea && pmChatArea.removeAttribute('hidden');
+    pmChatArea.removeAttribute('hidden');
     // render header name
     const chatWithNameEl = document.getElementById('pm-chat-with-name');
     if(chatWithNameEl) chatWithNameEl.textContent = selectedPMUserName;
     // load messages
     await loadConversationFromDB(otherId);
     // mark unread for this contact as read (simple approach: remove unread badges)
-    const btn = Array.from(pmUserList && pmUserList.querySelectorAll('button') || []).find(b=> b.dataset.userId === otherId);
+    const btn = Array.from(pmUserList.querySelectorAll('button')).find(b=> b.dataset.userId === otherId);
     if(btn){
       const badge = btn.querySelector('.pm-unread-badge');
       if(badge) badge.remove();
     }
-    pmChatInput && pmChatInput.focus();
+    pmChatInput.focus();
   }
 
   // send private messages
-  // guard: avoid duplicate submit if form already in sending state
-  pmChatForm && pmChatForm.addEventListener('submit', async (e)=>{ e.preventDefault(); if(pmChatForm.classList.contains('sending')) return; const text = (pmChatInput.value||'').trim(); if(!text || !selectedPMUserId) return; await sendPrivateMessageTo(selectedPMUserId, text); pmChatInput.value=''; });
-  pmSendBtn && pmSendBtn.addEventListener('click', async ()=>{ if(pmChatForm.classList.contains('sending')) return; const text = (pmChatInput.value||'').trim(); if(!text || !selectedPMUserId) return; await sendPrivateMessageTo(selectedPMUserId, text); pmChatInput.value=''; });
+  pmChatForm.addEventListener('submit', async (e)=>{ e.preventDefault(); const text = (pmChatInput.value||'').trim(); if(!text || !selectedPMUserId) return; await sendPrivateMessageTo(selectedPMUserId, text); pmChatInput.value=''; });
+  pmSendBtn.addEventListener('click', async ()=>{ const text = (pmChatInput.value||'').trim(); if(!text || !selectedPMUserId) return; await sendPrivateMessageTo(selectedPMUserId, text); pmChatInput.value=''; });
 
   async function sendPrivateMessageTo(otherId, text){
     const msg = {
@@ -882,55 +746,13 @@
       created_at: timeNow()
     };
     try{
-      // save locally first
+      // save locally
       await saveMessageToDB(msg);
       // append immediately if chatting with same user
       if(selectedPMUserId === otherId) appendPrivateMessageToUI(msg, otherId);
-      // set UI sending guard
-      pmChatForm.classList.add('sending');
-      pmSendBtn.disabled = true;
-      pmChatInput.disabled = true;
-
-      // set timeout fallback
-      const t = setTimeout(()=>{
-        pendingPrivateSends.delete(msg.id);
-        pmChatForm.classList.remove('sending');
-        pmSendBtn.disabled = false;
-        pmChatInput.disabled = false;
-        // note: we don't auto-resend, just re-enable UI; user can retry if needed
-        console.warn('[PM] ack timeout for', msg.id);
-      }, ACK_TIMEOUT);
-      pendingPrivateSends.set(msg.id, t);
-
-      // emit to server with optional ack callback (server may implement ack)
-      try{
-        socket.emit('private_message', msg, (ack)=>{
-          // if server calls ack, clear pending and re-enable UI
-          const timeoutId = pendingPrivateSends.get(msg.id);
-          if(timeoutId) clearTimeout(timeoutId);
-          pendingPrivateSends.delete(msg.id);
-          pmChatForm.classList.remove('sending');
-          pmSendBtn.disabled = false;
-          pmChatInput.disabled = false;
-          // optionally update message status UI if ack contains status
-          if(ack && ack.ok) {
-            // success — nothing more needed client-side for now
-          } else {
-            console.warn('[PM] server ack returned falsy for', msg.id, ack);
-          }
-        });
-      }catch(e){
-        // If emit throws (rare), clear timeout and re-enable
-        const timeoutId = pendingPrivateSends.get(msg.id);
-        if(timeoutId) clearTimeout(timeoutId);
-        pendingPrivateSends.delete(msg.id);
-        pmChatForm.classList.remove('sending');
-        pmSendBtn.disabled = false;
-        pmChatInput.disabled = false;
-        console.error('[PM] emit failed', e);
-      }
-
-    }catch(e){ console.error('private send failed', e); alert('Failed to send private message'); pmChatForm.classList.remove('sending'); pmSendBtn.disabled = false; pmChatInput.disabled = false; }
+      // emit to server (server must deliver only to recipient + sender)
+      socket.emit('private_message', msg);
+    }catch(e){ console.error('private send failed', e); alert('Failed to send private message'); }
   }
 
   // handle incoming private_message
@@ -938,32 +760,22 @@
     try{
       // basic shaping: ensure fields present
       if(!msg || !msg.id) return;
-      // SECURITY: ignore messages not addressed to or from this client (client-side check).
-      // NOTE: server must also enforce this — client check is just additional safety.
-      if(!(msg.toId === currentUserId || msg.fromId === currentUserId)) {
-        // not for us; ignore
-        return;
-      }
-
-      const alreadyExists = await existsMessageInDB(msg.id);
-      if(!alreadyExists){
+      // save if new
+      if(!(await existsMessageInDB(msg.id))){
         await saveMessageToDB(msg);
       }
-
-      // Avoid duplicate append: only append if we haven't displayed this message id yet.
-      const isRelevantToOpenConversation = privateMessengerOpen && selectedPMUserId && (msg.fromId === selectedPMUserId || msg.toId === selectedPMUserId);
-      if(isRelevantToOpenConversation){
-        if(!displayedPrivateMessageIds.has(msg.id)){
-          appendPrivateMessageToUI(msg, selectedPMUserId);
-          pmChatMessages.scrollTop = pmChatMessages.scrollHeight;
-        }
+      // if pm panel open and selected matches, append to UI
+      const otherId = (msg.fromId === currentUserId) ? msg.toId : msg.fromId;
+      if(privateMessengerOpen && selectedPMUserId && (msg.fromId === selectedPMUserId || msg.toId === selectedPMUserId)){
+        appendPrivateMessageToUI(msg, selectedPMUserId);
+        pmChatMessages.scrollTop = pmChatMessages.scrollHeight;
       } else {
-        // mark unread badge on contact (if exists), otherwise it will show when rendering contacts
-        const partnerId = (msg.fromId === currentUserId) ? msg.toId : msg.fromId;
-        const btn = Array.from(pmUserList && pmUserList.querySelectorAll('button') || []).find(b=> b.dataset.userId === partnerId);
+        // mark unread badge on contact (if exists), otherwise we will show it when rendering contacts
+        const btn = Array.from(pmUserList.querySelectorAll('button')).find(b=> b.dataset.userId === (msg.fromId === currentUserId ? msg.toId : msg.fromId));
         if(btn){
           let badge = btn.querySelector('.pm-unread-badge');
           if(badge){
+            // increment numeric value if possible
             const v = parseInt(badge.textContent||'0',10) || 0;
             badge.textContent = v+1;
           } else {
@@ -1003,7 +815,8 @@
   // close messenger on outside click (defensive)
   document.addEventListener('click', (e)=> {
     if(privateMessengerOpen && privateMessengerPanel && !privateMessengerPanel.contains(e.target) && !threeDotToggle.contains(e.target) && !openPrivateBtn.contains(e.target)){
-      // optional: do nothing to avoid accidental closes
+      // don't auto-close if clicking inside dropdown area etc.
+      // optional: keep open; for now do nothing (user should manually close)
     }
   });
 
