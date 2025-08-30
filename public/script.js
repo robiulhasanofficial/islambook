@@ -370,6 +370,72 @@
       socket.emit('announce_posts', metaList);
     }catch(e){ console.error('[announce_posts] failed', e); }
   });
+  // ---------- Totals logic: compute total posts and total likes (only count likes on current user's posts) ----------
+  function countLikesForPost(p){
+    if(Array.isArray(p.likes)) return p.likes.length;
+    if(typeof p.likes === 'number') return Number(p.likes) || 0;
+    if(p.likes && typeof p.likes === 'object' && p.likes.count) return Number(p.likes.count) || 0;
+    return 0;
+  }
+
+  async function computeTotals(){
+    try{
+      const posts = await getAllPostsFromDB();
+      const totalPosts = posts.length || 0;
+
+      // Count ONLY likes that belong to posts created by the current user
+      let totalLikesForMyPosts = 0;
+      for(const p of posts){
+        if(p.userId === currentUserId){
+          totalLikesForMyPosts += countLikesForPost(p);
+        }
+      }
+
+      // return structured object so we can extend later if needed
+      return { totalPosts, totalLikesForMyPosts };
+    }catch(e){
+      console.error('[totals] compute failed', e);
+      return { totalPosts:0, totalLikesForMyPosts:0 };
+    }
+  }
+
+  async function updateTotalsFromDB(){
+    const totalsBar = document.getElementById('totalsBar');
+    const totalLikesEl = document.getElementById('totalLikes');
+    const totalPostsEl = document.getElementById('totalPosts');
+    const likesBlock = document.querySelector('.total-likes');
+    if(!totalLikesEl || !totalPostsEl) return;
+
+    const { totalPosts, totalLikesForMyPosts } = await computeTotals();
+
+    totalPostsEl.textContent = String(totalPosts);
+    // IMPORTANT: show ONLY likes on *your* posts
+    totalLikesEl.textContent = String(totalLikesForMyPosts);
+    // optionally set a tooltip so it's clear to the user what this number represents
+    totalLikesEl.title = 'আপনার পোস্টগুলোর মোট লাইক';
+
+    // threshold check (keeps your previous golden logic; threshold still applies to your-post-likes)
+    const threshold = totalsBar && totalsBar.dataset && parseInt(totalsBar.dataset.likesThreshold, 10) ? parseInt(totalsBar.dataset.likesThreshold, 10) : 20;
+    if(likesBlock){
+      if(totalLikesForMyPosts >= threshold) likesBlock.classList.add('golden'); else likesBlock.classList.remove('golden');
+    }
+  }
+
+  // ---------- Socket handlers (keep existing emit/listen) ----------
+  socket.on('sync', async (posts)=>{ for(const p of posts||[]){ try{ if(!(await existsInDB(p.id))) await savePostToDB(p); }catch(e){} } await loadAndRenderFeed(); await updateTotalsFromDB(); });
+  socket.on('post', async (post)=>{ if(!post) return; if(await existsInDB(post.id)) return; await savePostToDB(post); prependPostToFeed(post); await updateTotalsFromDB(); });
+  socket.on('like', async (payload)=>{ try{ const db = await openDB(); const tx = db.transaction(STORE,'readwrite'); const store = tx.objectStore(STORE); const req = store.get(payload.postId); req.onsuccess = async ()=>{ const post = req.result; if(!post) return; post.likes = post.likes||[]; if(payload.action==='like'){ if(!post.likes.find(l=>l.id===payload.likeId||l.userId===payload.userId)) post.likes.push({id:payload.likeId,userId:payload.userId,userName:payload.userName||null,created_at:payload.created_at}); } else { post.likes = post.likes.filter(l=>l.id!==payload.likeId&&l.userId!==payload.userId); } await updatePostInDB(post); refreshPostInDOM(post.id,post); await updateTotalsFromDB(); }; }catch(e){console.error(e);} });
+  socket.on('comment', async (payload)=>{ try{ const db = await openDB(); const tx = db.transaction(STORE,'readwrite'); const store = tx.objectStore(STORE); const req = store.get(payload.postId); req.onsuccess = async ()=>{ const post = req.result; if(!post) return; post.comments = post.comments||[]; if(!post.comments.find(c=>c.id===payload.comment.id)){ post.comments.unshift(payload.comment); await updatePostInDB(post); refreshPostInDOM(post.id,post); } }; // comments don't change totals (but safe to refresh)
+    await updateTotalsFromDB(); }catch(e){console.error(e);} });
+
+  // NEW: respond to server's request to announce local posts (metadata only)
+  socket.on('please_announce_posts', async ()=> {
+    try{
+      const posts = await getAllPostsFromDB();
+      const metaList = posts.map(p=>({ id: p.id, created_at: p.created_at, userId: p.userId, userName: p.userName, meta: { size: (p.imageData && p.imageData.length) || 0, caption: p.caption || '' }, hasBlob: !!p.imageData }));
+      socket.emit('announce_posts', metaList);
+    }catch(e){ console.error('[announce_posts] failed', e); }
+  });
 
   // NEW: if server asks this client to upload specific posts (ids), send full posts
   socket.on('request_upload_posts', async (ids)=> {
@@ -939,3 +1005,5 @@
   })();
 
 })();
+
+
